@@ -14,5 +14,6 @@
   "portsAttributes": {
     "8080": { "label": "license-server" }
   },
-  "postCreateCommand": "chmod +x start-demo.sh"
+  "postCreateCommand": "chmod +x start-demo.sh",
+  "postStartCommand": "nohup setsid bash start-demo.sh > /tmp/start-demo.log 2>&1 < /dev/null &"
 }

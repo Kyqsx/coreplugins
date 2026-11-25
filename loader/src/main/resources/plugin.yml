@@ -1,0 +1,18 @@
+name: corePlugins
+main: br.com.coreplugins.loader.LoaderPlugin
+version: ${project.version}
+api-version: "1.13"
+description: Loader da CorePlugins. Autentica o IP:porta e carrega os produtos.
+authors: [CorePlugins]
+# Plugins que seus produtos usam via softdepend. Adicione os que forem necessários.
+softdepend: [Vault, PlaceholderAPI]
+commands:
+  coreplugins:
+    description: Status da licença e dos produtos
+    usage: /coreplugins [status|reload]
+    aliases: [cpl]
+    permission: coreplugins.admin
+permissions:
+  coreplugins.admin:
+    description: Gerenciar o loader
+    default: op

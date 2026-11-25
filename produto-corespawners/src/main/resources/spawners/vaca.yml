@@ -1,0 +1,97 @@
+# Tipo de gerador. O nome do arquivo (sem .yml) é o id do tipo: /spawners give <jogador> vaca
+# Em "currency" use o nome de qualquer economia detectada (ex.: coins, cash, vault) ou 'auto'.
+# 'auto' = economia padrão definida em economies.yml (por padrão, coins do coreEconomias).
+
+display: '&fGerador de Vaca'
+entity: COW
+entity-name: 'Vaca'
+
+# Item que o jogador recebe/coloca. Use {stack} para mostrar quantos geradores o item vale.
+item:
+  material: SPAWNER
+  name: '&eGerador de Vaca'
+  lore:
+    - ''
+    - ' &7Tipo: &fVaca'
+    - ' &7Stack: &f{stack}'
+    - ''
+    - '&7Coloque no chão para ativar.'
+
+permission: ''        # permissão para colocar (vazio = todos)
+kill-permission: ''   # permissão para matar os mobs (vazio = todos)
+
+health: 20.0
+# Tempo base (segundos) entre cada geração de mobs.
+interval-seconds: 10
+silk-touch: false     # só quebra com Toque Suave
+# Onde o mob aparece: SIDE = ao lado do gerador, a 'distance' blocos, no lado (norte, sul, leste ou oeste) em que o jogador
+# estava ao colocar; ABOVE = em cima do gerador.
+mob-position: SIDE
+distance: 2
+generate-online: false  # só gera se o dono estiver online
+exp: 1                # XP por mob morto
+
+entity-options:
+  baby: false
+  slime-size: 1
+
+stack:
+  max: 0              # máximo de geradores empilhados (0 = sem limite)
+
+mobs:
+  max: 0              # máximo de mobs acumulados (0 = sem limite)
+  name: '&7{amount}x &f{entity}'
+  # Matar segurando shift mata só 1 mob; sem shift mata todos (kill-all-without-shift: true) ou 1 (false).
+  kill-all-without-shift: true
+
+upgrades:
+  drops:
+    max-level: 5
+    add-per-level: 1        # drops extras por mob a cada nível
+    currency: auto
+    price: 5000
+    price-multiplier: 1.6   # o preço do nível N é price * multiplier^(N)
+  speed:
+    max-level: 5
+    reduce-seconds: 1       # segundos a menos no intervalo a cada nível
+    min-seconds: 2
+    currency: auto
+    price: 8000
+    price-multiplier: 1.6
+
+hologram:
+  enabled: true
+  offset: 2.0
+  lines:
+    - '&eGerador de {entity}'
+    - '&fDono: &a{owner}'
+    - '&fStack: &d{stack}x'
+    - '&fMobs: &7{mobs}'
+    - '&fDrops: &7{drops}'
+
+drops:
+  enabled: true          # false = este tipo não gera drops (só XP)
+  storage-max: 0         # máximo armazenado POR tipo de drop (0 = sem limite)
+  sell: true             # permitir vender pelo menu
+  auto-sell: true        # permitir a venda automática neste gerador
+  sell-permission: ''
+  collect-permission: ''
+  types:
+    leather:
+      name: '&fCouro'
+      chance: 98.0       # % de chance por mob
+      collect: true      # permitir coletar em item pelo menu
+      item:
+        material: LEATHER
+      price:
+        currency: auto
+        amount: 100.0
+    beef:
+      name: '&cCarne crua'
+      chance: 60.0
+      collect: true
+      item:
+        material: BEEF
+      price:
+        currency: auto
+        amount: 150.0

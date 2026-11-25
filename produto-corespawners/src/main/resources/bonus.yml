@@ -1,0 +1,11 @@
+# Bônus de venda por permissão (% a mais no valor ao vender/auto-vender drops).
+# Com general.accumulate-bonus: true os bônus somam; com false vale só o maior.
+bonus:
+  vip:
+    permission: 'corespawners.bonus.vip'
+    display: '&6[VIP]'
+    percent: 10.0
+  mvp:
+    permission: 'corespawners.bonus.mvp'
+    display: '&b[MVP]'
+    percent: 25.0

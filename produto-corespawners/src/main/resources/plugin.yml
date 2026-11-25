@@ -1,0 +1,81 @@
+name: coreSpawners
+main: br.com.coreplugins.spawners.SpawnersProduct
+version: ${project.version}
+api-version: "1.13"
+authors: [CorePlugins]
+description: Geradores de mobs com stack, drops, venda e upgrades. Detecta o coreEconomias sozinho.
+softdepend: [Vault, PlaceholderAPI, PlayerPoints]
+commands:
+  spawners:
+    description: Administração e informações dos geradores
+    usage: /spawners <give|booster|list|economies|reload|top|debug|help>
+    aliases: [cspawners]
+permissions:
+  corespawners.admin:
+    description: Administrar geradores (give, reload, abrir/quebrar o de qualquer jogador) e todas as permissões abaixo
+    default: op
+    children:
+      corespawners.place: true
+      corespawners.break: true
+      corespawners.use: true
+      corespawners.kill: true
+      corespawners.sell: true
+      corespawners.collect: true
+      corespawners.autosell: true
+      corespawners.upgrade: true
+      corespawners.booster: true
+      corespawners.friends: true
+      corespawners.toggle: true
+      corespawners.pack: true
+      corespawners.egg: true
+      corespawners.top: true
+      corespawners.debug: true
+      corespawners.limit.bypass: true
+  corespawners.place:
+    description: Colocar geradores
+    default: true
+  corespawners.break:
+    description: Quebrar (remover) os próprios geradores
+    default: true
+  corespawners.use:
+    description: Abrir o menu do gerador (botão direito)
+    default: true
+  corespawners.kill:
+    description: Matar os mobs dos geradores
+    default: true
+  corespawners.sell:
+    description: Vender os drops armazenados pelo menu
+    default: true
+  corespawners.collect:
+    description: Coletar os drops armazenados como itens
+    default: true
+  corespawners.autosell:
+    description: Ligar e usar a venda automática
+    default: true
+  corespawners.upgrade:
+    description: Comprar upgrades (drops e velocidade)
+    default: true
+  corespawners.booster:
+    description: Aplicar boosters no gerador
+    default: true
+  corespawners.friends:
+    description: Gerenciar os amigos do gerador
+    default: true
+  corespawners.toggle:
+    description: Ligar/desligar o gerador, o modo público e o holograma
+    default: true
+  corespawners.pack:
+    description: Shift para colocar o pack inteiro e shift + botão direito no ar para juntar os geradores
+    default: true
+  corespawners.egg:
+    description: Colocar o ovo de spawn no gerador (quando general.require-egg está ligado)
+    default: true
+  corespawners.top:
+    description: Ver o ranking (/spawners top)
+    default: true
+  corespawners.debug:
+    description: Usar /spawners debug (build, fila do banco, erros recentes)
+    default: op
+  corespawners.limit.bypass:
+    description: Sem limite de geradores (veja limits no config.yml)
+    default: false

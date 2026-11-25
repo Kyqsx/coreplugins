@@ -1,0 +1,5 @@
+# Config padrão do produto "Exemplo"
+mensagens:
+  boas-vindas: "&aBem-vindo, %player%! Este plugin roda pelo corePlugins."
+  sem-permissao: "&cSem permissão."
+  recarregado: "&aConfiguração recarregada."

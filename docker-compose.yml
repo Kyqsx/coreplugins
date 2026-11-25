@@ -1,0 +1,23 @@
+# PostgreSQL local para o license-server.
+#   DB_PASSWORD='uma-senha-forte' docker compose up -d postgres
+# E suba o servidor com o mesmo DB_PASSWORD no ambiente (DB_URL e DB_USER têm padrão para localhost).
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: licenses
+      POSTGRES_USER: ${DB_USER:-licenses}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-licenses} -d licenses"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

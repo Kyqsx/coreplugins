@@ -1,0 +1,79 @@
+# Exemplo de segundo tipo. Para criar outros, copie este arquivo, renomeie e ajuste.
+display: '&2Gerador de Zumbi'
+entity: ZOMBIE
+entity-name: 'Zumbi'
+
+item:
+  material: SPAWNER
+  name: '&2Gerador de Zumbi'
+  lore:
+    - ''
+    - ' &7Tipo: &2Zumbi'
+    - ' &7Stack: &f{stack}'
+    - ''
+    - '&7Coloque no chão para ativar.'
+
+permission: ''
+kill-permission: ''
+health: 20.0
+interval-seconds: 12
+silk-touch: false
+mob-position: SIDE
+distance: 2
+generate-online: false
+exp: 2
+
+entity-options:
+  baby: false
+  slime-size: 1
+
+stack:
+  max: 0
+
+mobs:
+  max: 0
+  name: '&7{amount}x &2{entity}'
+  kill-all-without-shift: true
+
+upgrades:
+  drops:
+    max-level: 5
+    add-per-level: 1
+    currency: auto
+    price: 6000
+    price-multiplier: 1.6
+  speed:
+    max-level: 5
+    reduce-seconds: 1
+    min-seconds: 3
+    currency: auto
+    price: 9000
+    price-multiplier: 1.6
+
+hologram:
+  enabled: true
+  offset: 2.2
+  lines:
+    - '&2Gerador de {entity}'
+    - '&fDono: &a{owner}'
+    - '&fStack: &d{stack}x'
+    - '&fMobs: &7{mobs}'
+    - '&fDrops: &7{drops}'
+
+drops:
+  enabled: true          # false = este tipo não gera drops (só XP)
+  storage-max: 0
+  sell: true
+  auto-sell: true
+  sell-permission: ''
+  collect-permission: ''
+  types:
+    flesh:
+      name: '&6Carne podre'
+      chance: 95.0
+      collect: true
+      item:
+        material: ROTTEN_FLESH
+      price:
+        currency: auto
+        amount: 120.0

@@ -1,0 +1,54 @@
+# Boosters: itens que o jogador usa clicando com o botão direito em um gerador (dele, de amigo ou público).
+# Cada gerador aceita 1 booster de cada tipo (kind) ao mesmo tempo; o tempo corre mesmo com o jogador offline.
+#
+#   kind: DROPS -> multiplica a quantidade de drops gerados
+#         SPEED -> multiplica a velocidade de geração (o intervalo é dividido pelo valor)
+#         SELL  -> multiplica o valor recebido ao vender os drops
+#   multiplier: maior que 1 (ex.: 2.0 = dobro)
+#   duration: segundos
+# Dar o item: /spawners booster <jogador> <id> [quantidade]
+# Placeholders no item: {booster} {multiplier} {time} {kind}
+
+boosters:
+  drops-2x:
+    kind: DROPS
+    multiplier: 2.0
+    duration: 3600
+    display: '&6Booster de Drops x2'
+    item:
+      material: EXPERIENCE_BOTTLE
+      name: '{booster}'
+      lore:
+        - ''
+        - ' &7Efeito: &fdrops x{multiplier}'
+        - ' &7Duração: &f{time}'
+        - ''
+        - '&eClique com o botão direito em um gerador.'
+  speed-2x:
+    kind: SPEED
+    multiplier: 2.0
+    duration: 1800
+    display: '&bBooster de Velocidade x2'
+    item:
+      material: SUGAR
+      name: '{booster}'
+      lore:
+        - ''
+        - ' &7Efeito: &fgeração x{multiplier} mais rápida'
+        - ' &7Duração: &f{time}'
+        - ''
+        - '&eClique com o botão direito em um gerador.'
+  sell-1_5x:
+    kind: SELL
+    multiplier: 1.5
+    duration: 3600
+    display: '&aBooster de Venda x1.5'
+    item:
+      material: GOLD_NUGGET
+      name: '{booster}'
+      lore:
+        - ''
+        - ' &7Efeito: &fvenda x{multiplier}'
+        - ' &7Duração: &f{time}'
+        - ''
+        - '&eClique com o botão direito em um gerador.'

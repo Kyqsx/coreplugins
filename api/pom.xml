@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>br.com.coreplugins</groupId>
+        <artifactId>coreplugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>coreplugins-api</artifactId>
+    <name>coreplugins-api</name>
+    <description>API pública: classe base ProductPlugin. Produtos compilam contra ela (scope provided).</description>
+
+    <properties>
+        <!-- Compila contra a API mais antiga suportada: se o código usar algo que não existe na 1.8, o build falha.
+             Em servidores mais novos o mesmo jar roda normalmente (o Bukkit mantém compatibilidade retroativa). -->
+        <spigot.version>1.8.8-R0.1-SNAPSHOT</spigot.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.spigotmc</groupId>
+            <artifactId>spigot-api</artifactId>
+            <exclusions>
+                <!-- o spigot-api 1.8.8 aponta para bungeecord-chat:1.8-SNAPSHOT, que não existe mais nos repositórios;
+                     api e loader não usam a API de chat do Bungee -->
+                <exclusion>
+                    <groupId>net.md-5</groupId>
+                    <artifactId>bungeecord-chat</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+    </dependencies>
+</project>

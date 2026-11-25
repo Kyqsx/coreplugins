@@ -1,0 +1,12 @@
+# Mensagens gerais. As mensagens de cada economia ficam em economies/<nome>.yml
+permission: '&cVocê não possui permissão para isto.'
+reloaded: '&aConfigurações recarregadas. &7(Alterações de banco de dados exigem reiniciar o servidor.)'
+only-player: '&cApenas jogadores podem abrir o menu.'
+load-failed: '&cNão foi possível carregar seus dados de economia. Tente novamente em instantes.'
+list-header: '&acoreEconomias - economias carregadas:'
+list-line: ' &7- &f{id} &8(comando: &7/{command}&8, formato: &7{format}&8)'
+help:
+  - '&a<--> coreEconomias <-->'
+  - ' &f/economies menu &8- &7Abre o menu de configuração das economias.'
+  - ' &f/economies list &8- &7Lista as economias carregadas.'
+  - ' &f/economies reload &8- &7Recarrega as configurações.'

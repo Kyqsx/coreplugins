@@ -1,0 +1,163 @@
+# Mensagens do coreSpawners. Cores com &. Placeholders entre {chaves}.
+
+words:
+  # As chaves precisam de aspas: sem elas o YAML lê on/off/yes/no como verdadeiro/falso.
+  'on': '&aLIGADO'
+  'off': '&cDESLIGADO'
+  'yes': '&aSim'
+  'no': '&cNão'
+  egg-missing: '&cSem ovo'
+
+general:
+  no-permission: '&cVocê não tem permissão para isto. &7({permission})'
+  player-only: '&cApenas jogadores podem fazer isto.'
+  player-not-found: '&cJogador &f{player}&c não encontrado.'
+  invalid-number: '&cNúmero inválido: &f{value}&c.'
+  reloaded: '&aConfigurações recarregadas. &7({types} tipo(s), {economies} economia(s))'
+  survival-only: '&cSó é possível usar geradores no modo survival.'
+  cancelled: '&cAção cancelada.'
+  help:
+    - '&6<--> coreSpawners <-->'
+    - ' &f/spawners give <jogador> <tipo> [quantidade] [stack] &8- &7Dar geradores.'
+    - ' &f/spawners booster <jogador> <id> [quantidade] &8- &7Dar boosters.'
+    - ' &f/spawners list &8- &7Listar os tipos.'
+    - ' &f/spawners economies &8- &7Ver as economias detectadas.'
+    - ' &f/spawners reload &8- &7Recarregar as configurações.'
+    - ' &f/spawners debug &8- &7Versão do build, geradores, fila do banco e erros recentes.'
+    - ' &f/spawners top [stack|kills|sales] &8- &7Ranking de geradores.'
+  help-player:
+    - '&6<--> coreSpawners <-->'
+    - ' &f/spawners top [stack|kills|sales] &8- &7Ranking de geradores.'
+
+give:
+  type-not-found: '&cTipo não encontrado. Tipos disponíveis: &f{list}'
+  given: '&aVocê deu &f{amount}x {type}&a (stack {stack}) para &f{player}&a.'
+  received: '&aVocê recebeu &f{amount}x {type}&a.'
+  list: '&aTipos disponíveis: &f{list}'
+
+block:
+  world-blocked: '&cVocê não pode colocar geradores neste mundo.'
+  type-permission: '&cVocê não tem permissão para colocar este tipo de gerador.'
+  placed: '&a{amount}x {type}&a colocado(s).'
+  merged: '&a+{amount} no stack do gerador. Stack atual: &f{stack}&a.'
+  stack-max: '&cEste gerador atingiu o stack máximo ({max}).'
+  limit: '&cVocê atingiu o seu limite de geradores (&f{used}&c/&f{limit}&c). Restam &f{left}&c e esta colocação usaria &f{amount}&c.'
+  protected: '&cVocê não pode colocar geradores aqui (terreno/ilha protegido).'
+  packed: '&aGeradores iguais do inventário unidos em 1, com stack &f{stack}&a.'
+  broken: '&a{amount}x {type}&a removido(s).'
+  not-owner: '&cSomente o dono pode remover este gerador.'
+  silk-touch: '&cVocê precisa de uma ferramenta com Toque Suave para quebrar este gerador.'
+  storage-not-empty: '&cVenda ou colete os drops armazenados antes de remover o gerador.'
+
+access:
+  denied: '&cVocê não tem acesso a este gerador.'
+  only-owner: '&cSomente o dono pode fazer isto.'
+  kill-denied: '&cVocê não tem permissão para matar estes mobs. &7({permission})'
+
+drops:
+  sold: '&aVocê vendeu &f{amount}x {drop}&a por &6{value}&a. &7(bônus: {bonus}%)'
+  sold-all: '&aVocê vendeu os drops do gerador por &6{value}&a. &7(bônus: {bonus}%)'
+  nothing: '&cNão há drops para isto.'
+  disabled: '&cO sistema de drops está desativado neste gerador.'
+  sell-disabled: '&cA venda de drops está desativada neste gerador.'
+  collect-disabled: '&cNão é possível coletar este drop em itens.'
+  no-permission: '&cVocê não tem permissão para isto. &7({permission})'
+  collected: '&aVocê coletou &f{amount}x {drop}&a.'
+  inventory-full: '&cSeu inventário está cheio.'
+  autosell: '&a+{value} &7(venda automática: {summary})'
+
+upgrade:
+  done: '&aUpgrade de &f{upgrade}&a comprado! Nível &f{level}&a por &6{price}&a.'
+  max: '&cEste upgrade já está no nível máximo.'
+  disabled: '&cEste upgrade não está disponível neste gerador.'
+  names:
+    drops: 'Drops'
+    speed: 'Velocidade'
+
+economy:
+  no-balance: '&cVocê não tem saldo suficiente. Preço: &f{price}&c.'
+  unavailable: '&cA economia &f{currency}&c não está disponível no momento.'
+  error: '&cNão foi possível concluir a cobrança. Tente novamente.'
+
+friends:
+  prompt: |
+
+    &aDigite no chat o nome do jogador que quer adicionar.
+    &7Para cancelar digite &ncancelar&7.
+
+  added: '&aVocê adicionou &f{player}&a ao gerador.'
+  removed: '&aVocê removeu &f{player}&a do gerador.'
+  exists: '&cEste jogador já está no gerador.'
+  is-owner: '&cVocê não pode adicionar o dono como amigo.'
+  max: '&cEste gerador atingiu o limite de amigos ({max}).'
+  not-found: '&cNão encontrei este jogador (ele precisa já ter entrado no servidor).'
+
+toggle:
+  status: '&aGerador {state}&a.'
+  public: '&aGerador público: {state}&a.'
+  hologram: '&aHolograma: {state}&a.'
+  autosell: '&aVenda automática: {state}&a.'
+  autosell-no-permission: '&cVocê não tem permissão para a venda automática.'
+
+economies:
+  header: '&6<--> Economias detectadas <-->'
+  default: ' &7Padrão para "auto": &f{name}'
+  line: ' &f{name} &8- &7{source} &8- {state}'
+  available: '&aDisponível'
+  unavailable: '&cIndisponível'
+  none: '&cNenhuma economia detectada. Instale o coreEconomias, o Vault ou o PlayerPoints.'
+
+egg:
+  needed: '&eEste gerador está sem ovo. Clique nele com o &fovo de spawn de {entity}&e na mão para ativá-lo.'
+  not-needed: '&cEste gerador não precisa de ovo (ou já está ativo).'
+  wrong: '&cEste gerador só aceita o ovo de spawn de &f{entity}&c.'
+  applied: '&aOvo de {entity}&a colocado! O gerador está ativo.'
+
+booster:
+  applied: '&aBooster {booster}&a (x{multiplier}) ativado por &f{time}&a.'
+  already: '&cJá existe um booster de &f{kind}&c ativo neste gerador.'
+  not-found: '&cBooster não encontrado. Disponíveis: &f{list}'
+  given: '&aVocê deu &f{amount}x {booster}&a para &f{player}&a.'
+  received: '&aVocê recebeu &f{amount}x {booster}&a. Clique com ele em um gerador seu para usar.'
+  state-active: '&aAtivo'
+  state-inactive: '&7Inativo'
+  kinds:
+    DROPS: 'drops'
+    SPEED: 'velocidade'
+    SELL: 'venda'
+
+# Mostrada acima da hotbar ao bater em um mob do gerador.
+actionbar:
+  hit: '&c❤ &f{health}&7/&f{max} &8| &eDano: &f{damage} &8| &7Mobs: &f{mobs}'
+  kill: '&c☠ &fAbateu &c{killed} &8| &eDano: &f{damage} &8| &7Restam: &f{mobs}'
+
+# /spawners top
+top:
+  usage: '&cUse: &f/spawners top [stack|kills|sales]'
+  header: '&6<--> Top geradores: &f{category} &6<-->'
+  line: ' &e{pos}º &f{name} &8- &a{value}'
+  you: ' &7Sua posição: &f{pos}º &8- &a{value}'
+  empty: ' &7Ninguém no ranking ainda.'
+  categories:
+    stack: 'Stack total'
+    kills: 'Mobs mortos'
+    sales: 'Vendas'
+
+# /spawners debug
+debug:
+  header: '&6<--> coreSpawners debug <-->'
+  build: ' &7Build: &f{version} &8| &7compilado em: &f{built}'
+  jar: ' &7Jar em uso: &f{name} &8| &7{size} &8| &7modificado: &f{modified} &8| &7sha256: &f{sha}'
+  path: ' &7Caminho: &f{path}'
+  server: ' &7Servidor: &f{server} &8| &7Java: &f{java}'
+  uptime: ' &7Ativo há: &f{time}'
+  spawners: ' &7Geradores: &f{blocks} &7blocos &8| &7stack total: &f{stack} &8| &7mobs: &f{mobs} &8| &7tipos: &f{types}'
+  database: ' &7Banco: &f{type} &8| &7pendentes: &f{dirty} &7geradores, &f{deleted} &7remoções, &f{stats} &7jogadores &8| &7fila: &f{queued} &7(ativas: {active})'
+  last-write: ' &7Última gravação: &ahá {ago} &8| &f{ms} ms &8| &f{items} &7registro(s)'
+  last-write-error: ' &7Última gravação: &cFALHOU há {ago} &8| &c{error}'
+  last-write-none: ' &7Última gravação: &fainda não houve nenhuma desde que o servidor ligou.'
+  economy: ' &7Economias: &f{count} &8| &7padrão: &f{default}'
+  hooks: ' &7PlaceholderAPI: {papi} &8| &7Proteção de terreno: {protection}'
+  no-errors: ' &7Erros recentes: &anenhum.'
+  errors-header: ' &7Erros recentes (&f{count}&7), do mais novo para o mais antigo:'
+  error-line: '  &8[{time}] &c{level}&8: &f{text}'

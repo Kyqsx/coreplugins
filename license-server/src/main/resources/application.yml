@@ -1,0 +1,46 @@
+server:
+  port: 8080
+  # Atrás de Nginx/Cloudflare: use license.trust-forwarded-for=true (e só aceite o proxy na rede).
+spring:
+  application:
+    name: license-server
+  # Somente PostgreSQL. Suba um local com `docker compose up -d postgres` (veja docker-compose.yml na raiz).
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/licenses}
+    username: ${DB_USER:licenses}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update          # em produção real, troque por Flyway/Liquibase
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 128MB
+      max-request-size: 128MB
+
+license:
+  # Painel admin: login com conta de administrador (role ADMIN) + 2FA TOTP. Sem token fixo.
+  admin-email: ${ADMIN_EMAIL:}               # cria/promove o primeiro admin na inicialização
+  admin-password: ${ADMIN_PASSWORD:}         # mín. 12 caracteres; só é lida ao criar a conta (ou com ADMIN_RESET)
+  admin-require-2fa: ${ADMIN_REQUIRE_2FA:true}  # só desligue em teste local
+  admin-reset: ${ADMIN_RESET:false}          # true por UMA subida: zera senha e 2FA do ADMIN_EMAIL
+  # Jars dos produtos, par RSA e segredo das sessões ficam no PostgreSQL (nada em disco).
+  # Migrando de uma instalação antiga? Na PRIMEIRA subida num banco vazio, passe o conteúdo dos arquivos antigos
+  # (data/keys/private.key, public.key, token.secret) para o servidor reaproveitar as mesmas chaves dos loaders.
+  # Depois que subiu uma vez, remova estas variáveis do ambiente: elas só são lidas se o banco ainda não tem a chave.
+  seed-rsa-private-key: ${SEED_RSA_PRIVATE_KEY:}
+  seed-rsa-public-key: ${SEED_RSA_PUBLIC_KEY:}
+  seed-token-secret: ${SEED_TOKEN_SECRET:}
+  trust-forwarded-for: ${TRUST_FORWARDED_FOR:false}
+  # Chave mestra (Base64 de 32 bytes: `openssl rand -base64 32`) que cifra os segredos no banco com AES-GCM.
+  # Só no ambiente, NUNCA no banco nem no repositório; sem ela o servidor guarda tudo em texto puro (só dev).
+  master-key: ${MASTER_KEY:}
+  require-master-key: ${REQUIRE_MASTER_KEY:false}
+
+store:
+  payment-mode: ${PAYMENT_MODE:simulated}          # simulated | mercadopago
+  mercadopago-access-token: ${MP_ACCESS_TOKEN:}    # só com payment-mode=mercadopago
+  public-url: ${PUBLIC_URL:}                       # URL pública HTTPS (webhook do Mercado Pago); vazio em localhost
+  mercadopago-test-mode: ${MP_TEST_MODE:false}     # true só com credencial de TESTE: envia payer.first_name=APRO (aprovação automática na sandbox)
+  order-expires-minutes: 30
+  max-servers-per-customer: 5

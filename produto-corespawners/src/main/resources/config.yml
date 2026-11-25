@@ -1,0 +1,98 @@
+# coreSpawners - configurações gerais.
+# Cada tipo de gerador fica em spawners/<id>.yml (o nome do arquivo é o id do tipo).
+# Economias: NÃO é preciso configurar nada. O plugin detecta sozinho o coreEconomias (todas as moedas),
+# o Vault e o PlayerPoints. Veja economies.yml apenas se quiser apelidos ou integrar outro plugin.
+
+debug-mode: false
+
+database:
+  # SQLITE (arquivo local) ou MYSQL
+  type: SQLITE
+  # Prefixo das tabelas (apenas letras, números e _)
+  table-prefix: 'spw_'
+  sqlite-file: 'database.db'
+  mysql:
+    host: localhost
+    port: 3306
+    database: rankup
+    username: root
+    password: ''
+    parameters: 'useSSL=false&characterEncoding=utf8&connectTimeout=3000&socketTimeout=8000'
+
+# Intervalo (segundos) para gravar no banco os geradores que mudaram.
+save-interval-seconds: 30
+
+general:
+  # Mundos em que não é possível colocar geradores.
+  world-blacklist: []
+  # false (padrão) = o gerador já vem com o ovo: basta colocar no chão.
+  # true = o gerador vem vazio e só produz depois de clicar nele com o ovo de spawn do mob (o ovo é consumido).
+  require-egg: false
+  # Liga/desliga o sistema de drops em TODOS os geradores (cada tipo também tem drops.enabled).
+  # Desligado: os mobs são gerados e mortos (com XP), mas nada é armazenado nem vendido.
+  drops-enabled: true
+  # Só permitir usar geradores no modo survival.
+  survival-only: true
+  # Ao colocar um gerador do MESMO tipo e do MESMO dono dentro deste raio (blocos),
+  # ele é somado ao stack do que já existe em vez de criar outro. 0 = nunca empilhar.
+  merge-radius: 5
+  # true = agachado (shift) ao colocar, todo o pack de geradores da mão vira UM gerador (soma o stack) e
+  # empilha no que já existe. false = sempre coloca 1 item por vez.
+  shift-place-all: true
+  # Máximo de amigos por gerador (0 = sem limite).
+  friend-max: 0
+  # Valores iniciais de um gerador novo.
+  public-default: false
+  hologram-default: true
+  autosell-default: false
+  # Permissão para ligar a venda automática (vazio = todos).
+  autosell-permission: ''
+  # true = soma todos os bônus de venda a que o jogador tem permissão; false = só o maior.
+  accumulate-bonus: true
+  # true = os mobs sofrem dano de fogo, lava, queda etc. Recomendado deixar false.
+  mob-natural-damage: false
+  # Mostra acima da hotbar a vida do mob e o dano causado ao bater (mensagens em messages.yml, seção actionbar).
+  actionbar-hit: true
+  # Jogadores com o menu aberto quando o gerador é removido são fechados.
+  close-menu-on-break: true
+
+# Bônus de drops por quantidade de geradores do mesmo tipo no mesmo chunk
+# (soma dos stacks). A maior faixa atingida é aplicada.
+chunk-bonus:
+  enabled: true
+  table:
+    10: 1.5
+    20: 2.0
+    50: 3.0
+
+# Limite de geradores por jogador.
+# Permissões (dê a um grupo no LuckPerms ou outro plugin de permissões):
+#   corespawners.limit.<N>        -> limite N (vale o maior que o jogador tiver). Ex.: corespawners.limit.10
+#   corespawners.limit.0 / .unlimited / .* / .bypass -> sem limite (a administração já tem o .bypass)
+# Quem não tem nenhuma delas usa o valor "default" abaixo. A permissão vale para o dono também.
+limits:
+  # 0 = ilimitado
+  default: 0
+  # STACK = conta a soma dos stacks (um gerador com stack 50 conta 50)
+  # BLOCKS = conta só os blocos de gerador colocados (empilhar não gasta limite)
+  count: STACK
+
+# Proteção de terreno/ilha (WorldGuard, PlotSquared, GriefPrevention, Towny, Residence, Lands,
+# SuperiorSkyblock, BentoBox...). Funciona com qualquer plugin que bloqueie colocar blocos.
+#   true  = o gerador só é criado depois que os plugins de terreno liberaram a colocação
+#   false = comportamento antigo: o plugin decide antes de alguns plugins de terreno dizerem não
+protection:
+  enabled: true
+
+# Ranking de geradores (/spawners top e placeholders do PlaceholderAPI).
+ranking:
+  # A cada quantos segundos o ranking é refeito.
+  refresh-seconds: 10
+  # Quantas posições guardar para %corespawners_top_...% (1 a 100).
+  size: 10
+  # Moeda do ranking de vendas e do placeholder %corespawners_sold%: auto (padrão do servidor) ou o id da moeda.
+  sales-currency: auto
+  placeholders:
+    empty-name: '-'
+    empty-value: '0'
+    unlimited: '∞'

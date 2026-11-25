@@ -1,0 +1,61 @@
+# Configurações gerais do plugin. Cada economia tem seu próprio arquivo em economies/.
+
+debug-mode: false
+
+# As alterações de saldo são gravadas no banco imediatamente, como variações (saldo = saldo + x),
+# então vários servidores no mesmo MySQL não sobrescrevem o saldo um do outro.
+# Intervalo (segundos) da manutenção: libera da memória quem saiu e reenvia nomes pendentes.
+save-interval-seconds: 30
+
+# Intervalo (segundos) para reler do banco o saldo dos jogadores online (rede de segurança para
+# mudanças feitas por outros servidores). Com Redis ligado a atualização é quase instantânea e este
+# valor só cobre mensagens perdidas; sem Redis, é o atraso máximo para ver mudanças de outro servidor.
+resync-seconds: 30
+
+# Intervalo (minutos) para atualizar o TOP de cada economia.
+top-refresh-minutes: 10
+
+# Economia exposta ao Vault (para plugins de loja, rankup, etc.). Use o nome do arquivo em economies/ (sem .yml).
+vault-currency: coins
+
+# Sufixos do formato LETTER, em ordem crescente (cada um vale 1000x o anterior).
+# Também são aceitos ao digitar valores: 10k, 2.5M, 1B...
+suffixes: [K, M, B, T, Q, QQ, S, SS, OC, N, D]
+
+# Segurança contra gasto duplo entre servidores (só tem efeito com MYSQL).
+# Ligado: pagar/remover/comprar (Vault) só são liberados depois que o BANCO confirmar o débito, com o
+# saldo conferido lá (nunca fica negativo). Banco fora do ar = débito recusado, nunca liberado de graça.
+# Desligado: o saldo é debitado na hora na memória e gravado depois (mais rápido, mas dois servidores
+# podem gastar o mesmo saldo ao mesmo tempo).
+safety:
+  strict-debit: true
+  # Tempo máximo (ms) esperando o banco confirmar um débito.
+  debit-timeout-ms: 3000
+
+# Redis (opcional): só AVISA os outros servidores que um saldo mudou, para releitura imediata.
+# Nenhum saldo fica no Redis; se ele cair, a economia continua normalmente pelo banco.
+# Use o mesmo canal em todos os servidores da mesma rede (e canais diferentes para redes diferentes).
+redis:
+  enabled: false
+  host: localhost
+  port: 6379
+  username: ''
+  password: ''
+  ssl: false
+  channel: 'coreeconomias'
+  timeout-ms: 2000
+
+database:
+  # SQLITE (arquivo local) ou MYSQL
+  type: SQLITE
+  # Prefixo das tabelas (apenas letras, números e _)
+  table-prefix: 'eco_'
+  sqlite-file: 'database.db'
+  mysql:
+    host: localhost
+    port: 3306
+    database: rankup
+    username: root
+    password: ''
+    # connectTimeout/socketTimeout evitam que um MySQL travado congele o servidor (mantenha socketTimeout >= 8000).
+    parameters: 'useSSL=false&characterEncoding=utf8&connectTimeout=3000&socketTimeout=8000'

@@ -1,0 +1,37 @@
+# Economias do coreSpawners.
+#
+# NORMALMENTE VOCÊ NÃO PRECISA EDITAR ESTE ARQUIVO.
+# Com auto-detect ligado, o plugin encontra sozinho:
+#   - coreEconomias : TODAS as moedas (coins, cash, ...). Use o id do arquivo em economies/ do coreEconomias.
+#                     Também valem os formatos 'core:coins' e 'economias-coins'.
+#   - Vault         : nomes 'vault' ou 'money' (usa a economia principal registrada no Vault).
+#   - PlayerPoints  : nomes 'playerpoints' ou 'points'.
+# Moedas criadas depois no coreEconomias (menu /economies) também passam a valer sem reiniciar.
+# Para ver o que foi detectado: /spawners economies
+#
+# Nos arquivos de spawners/ escreva o nome da economia em "currency:" (ex.: currency: coins).
+# O valor 'auto' usa a economia padrão definida abaixo.
+
+auto-detect: true
+
+# Economia padrão para 'currency: auto'.
+#   auto  = 'coins' se existir no coreEconomias; senão a primeira moeda do coreEconomias; senão Vault; senão PlayerPoints.
+#   ou o nome de qualquer economia detectada/definida (ex.: cash).
+default: auto
+
+# Apelidos: nome -> economia existente.
+aliases:
+  # dinheiro: vault
+  # gemas: cash
+
+# Integração com QUALQUER outro plugin de economia (opcional).
+# Usa um placeholder do PlaceholderAPI para ler o saldo e comandos do console para dar/tirar.
+# Atenção: como o plugin de destino não devolve "deu certo/errado", o débito por comando é feito
+# depois de conferir o saldo; teste com cuidado antes de usar em produção.
+# Placeholders nos comandos: {player} {amount}
+custom: {}
+#  pontosx:
+#    display: 'Pontos X'
+#    balance-placeholder: '%pontosx_balance%'
+#    give-command: 'pontosx give {player} {amount}'
+#    take-command: 'pontosx take {player} {amount}'

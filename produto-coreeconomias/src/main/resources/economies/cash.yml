@@ -1,0 +1,96 @@
+# Economia "cash". O nome do arquivo (sem .yml) é o identificador dela:
+# usado em permissões (coreeconomias.cash.*), placeholders (%economias_cash%) e no vault-currency do config.yml.
+# Para criar outra economia, copie este arquivo, renomeie e ajuste.
+#
+# Permissões (troque "cash" pelo nome do arquivo):
+#   coreeconomias.cash.use / look / pay / top   -> precisam ser concedidas (ninguém tem por padrão)
+#   coreeconomias.cash.player -> pacote com os quatro acima (coreeconomias.player vale para todas as economias)
+#   coreeconomias.cash.add / remove / set / forceupdate -> apenas OP
+#   coreeconomias.cash.* -> tudo desta economia (troque cash pelo nome do arquivo)
+#   coreeconomias.admin -> acesso total (e coreeconomias.menu abre o menu de configuração)
+
+name:
+  singular: 'cash'
+  plural: 'cash'
+
+# LETTER: 1K, 1.5M, 2B...   |   NUMBER: 1.000, 1.500.000
+format: LETTER
+
+# Saldo de quem entra pela primeira vez.
+default: 0
+
+command:
+  name: 'cash'
+  aliases: []
+
+# Nomes dos subcomandos (opcional; estes são os padrões).
+sub-command:
+  add: [add, adicionar, depositar]
+  remove: [remove, remover, sacar]
+  set: [set, setar, definir]
+  pay: [pay, pagar, enviar]
+  top: [top]
+  help: [help, ajuda]
+  forceupdate: [forceupdate]
+
+# Segundos entre usos do comando (0 = sem limite). Staff com permissão de add não é limitada.
+command-delay: 0
+
+pay:
+  enabled: true
+  # Valor mínimo por pagamento
+  min: 1
+  # true = só permite pagar jogadores online
+  block-offline: false
+
+top:
+  # Quantas posições mostrar (1 a 50)
+  size: 10
+
+# Placeholders: {amount} {unit} {player} {pos} {time} {command}
+messages:
+  permission: '&cVocê não possui permissão para isto.'
+  only-player: '&cApenas jogadores podem usar este comando.'
+  target: '&cEste jogador não foi encontrado.'
+  offline-pay: '&cVocê só pode enviar para jogadores online.'
+  number: '&cQuantia inválida. Exemplos: 100, 2.5k, 1M.'
+  has: '&cVocê não possui esta quantia de cash.'
+  target-has: '&cO jogador não possui esta quantia.'
+  yourself: '&cVocê não pode pagar a si mesmo.'
+  min-pay: '&cO valor mínimo para enviar é &f{amount} {unit}&c.'
+  delay: '&cAguarde {time}s para usar este comando novamente.'
+  error: '&cNão foi possível concluir a operação.'
+  force-update: '&aVocê forçou a atualização do TOP.'
+  balance: '&6&lCASH &7▶ &fVocê possui &a{amount} {unit}&f.'
+  balance-target: '&aO jogador &7{player}&a possui &f{amount} {unit}&a.'
+  set: '&aVocê definiu os cash de &7{player}&a para &f{amount} {unit}&a.'
+  add: '&aVocê adicionou &f{amount} {unit}&a para &7{player}&a.'
+  remove: '&aVocê removeu &f{amount} {unit}&a de &7{player}&a.'
+  send: '&aVocê enviou &f{amount} {unit}&a para &7{player}&a.'
+  received: '&aVocê recebeu &f{amount} {unit}&a de &7{player}&a.'
+  usage-pay: '&cUse: /{command} pagar <jogador> <quantia>'
+  usage-add: '&cUse: /{command} adicionar <jogador> <quantia>'
+  usage-remove: '&cUse: /{command} remover <jogador> <quantia>'
+  usage-set: '&cUse: /{command} setar <jogador> <quantia>'
+  top-empty: '&cO TOP ainda não foi calculado. Tente novamente em instantes.'
+  top-header:
+    - ''
+    - '&6&lTOP CASH &7(atualizado periodicamente)'
+    - ''
+  top-line: ' &f{pos}º &7{player}&8: &e{amount} {unit}'
+  help:
+    - '&6<--> Comandos de cash <-->'
+    - ' &f/{command} &8- &7Ver seu saldo.'
+    - ' &f/{command} <jogador> &8- &7Ver o saldo de outro jogador.'
+    - ' &f/{command} pagar <jogador> <quantia> &8- &7Enviar cash.'
+    - ' &f/{command} top &8- &7Ver os mais ricos.'
+  help-admin:
+    - '&6<--> Comandos de cash &7(STAFF)&6 <-->'
+    - ' &f/{command} &8- &7Ver seu saldo.'
+    - ' &f/{command} <jogador> &8- &7Ver o saldo de outro jogador.'
+    - ' &f/{command} pagar <jogador> <quantia> &8- &7Enviar cash.'
+    - ' &f/{command} adicionar <jogador> <quantia> &8- &7Adicionar cash.'
+    - ' &f/{command} remover <jogador> <quantia> &8- &7Remover cash.'
+    - ' &f/{command} setar <jogador> <quantia> &8- &7Definir o saldo.'
+    - ' &f/{command} top &8- &7Ver os mais ricos.'
+    - ' &f/{command} forceupdate &8- &7Atualizar o TOP agora.'

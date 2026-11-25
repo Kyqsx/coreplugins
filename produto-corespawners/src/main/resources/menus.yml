@@ -1,0 +1,253 @@
+# Menus do coreSpawners.
+# material aceita: nome do material (nomes novos e antigos funcionam, ex.: GUNPOWDER ou SULPHUR),
+#   'NOME:dado' (versões antigas), 'head:<jogador>' (cabeça de jogador) ou 'texture:<hash>' (cabeça com textura).
+# Placeholders gerais: {type} {owner} {stack} {mobs} {status} {public} {hologram} {autosell}
+#   {drops_total} {drops_per_mob} {interval} {friends} {id}
+
+main:
+  title: '&8{type}'
+  size: 36
+  info:
+    slot: 4
+    material: SPAWNER
+    name: '&e{type}'
+    lore:
+      - ''
+      - ' &7Dono: &f{owner}'
+      - ' &7Stack: &f{stack}'
+      - ' &7Status: {status}'
+      - ' &7Ovo: {egg}'
+      - ' &7Mobs gerados: &f{mobs}'
+      - ' &7Drops armazenados: &f{drops_total}'
+      - ''
+      - ' &7Drops por mob: &b{drops_per_mob}'
+      - ' &7Tempo de geração: &b{interval}s'
+      - ''
+  drops:
+    slot: 10
+    material: CHEST
+    name: '&aDrops'
+    lore:
+      - '&7Veja, venda ou colete os drops'
+      - '&7armazenados neste gerador.'
+      - ''
+      - ' &7Armazenados: &f{drops_total}'
+      - ''
+      - '&eClique para abrir.'
+  upgrades:
+    slot: 12
+    material: ANVIL
+    name: '&aUpgrades'
+    lore:
+      - '&7Melhore a quantidade de drops'
+      - '&7e a velocidade de geração.'
+      - ''
+      - '&eClique para abrir.'
+  boosters:
+    slot: 14
+    material: EXPERIENCE_BOTTLE
+    name: '&aBoosters'
+    lore:
+      - '&7Veja os boosters ativos.'
+      - '&7Para ativar um, clique neste gerador'
+      - '&7com o item do booster na mão.'
+      - ''
+      - '&eClique para ver.'
+  friends:
+    slot: 16
+    material: PLAYER_HEAD
+    name: '&aAmigos'
+    lore:
+      - '&7Quem pode usar este gerador.'
+      - ''
+      - ' &7Amigos: &f{friends}'
+      - ''
+      - '&eClique para gerenciar.'
+  status:
+    slot: 20
+    material: LEVER
+    name: '&aLigar / desligar'
+    lore:
+      - '&7Status: {status}'
+      - ''
+      - '&eClique para alternar.'
+  public:
+    slot: 22
+    material: ENDER_EYE
+    name: '&aGerador público'
+    lore:
+      - '&7Qualquer jogador pode matar os mobs.'
+      - ''
+      - ' &7Público: {public}'
+      - ''
+      - '&eClique para alternar.'
+  hologram:
+    slot: 24
+    material: NAME_TAG
+    name: '&aHolograma'
+    lore:
+      - '&7Holograma: {hologram}'
+      - ''
+      - '&eClique para alternar.'
+  autosell:
+    slot: 31
+    material: GOLD_INGOT
+    name: '&aVenda automática'
+    lore:
+      - '&7Vende os drops na hora em que'
+      - '&7os mobs morrem.'
+      - ''
+      - ' &7Status: {autosell}'
+      - ''
+      - '&eClique para alternar.'
+
+drops:
+  title: '&8Drops - {type}'
+  size: 54
+  slots: [10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34]
+  back-slot: 49
+  sell-all-slot: 53
+  # O material do ícone vem do drop; aqui só o nome e a descrição.
+  item:
+    name: '{drop}'
+    lore:
+      - ''
+      - ' &7Armazenados: &f{stored}'
+      - ' &7Valor por unidade: &a{unit_value}'
+      - ' &7Valor total: &a{total_value}'
+      - ''
+      - '&eEsquerdo &7para vender.'
+      - '&eDireito &7para coletar em itens.'
+  sell-all:
+    material: EMERALD
+    name: '&aVender tudo'
+    lore:
+      - '&7Vende todos os drops armazenados.'
+      - ''
+      - '&eClique para vender.'
+  back:
+    material: ARROW
+    name: '&cVoltar'
+    lore: ['&7Voltar ao menu do gerador.']
+
+upgrades:
+  title: '&8Upgrades - {type}'
+  size: 27
+  drops-slot: 11
+  speed-slot: 15
+  back-slot: 22
+  # Placeholders extras: {level} {max} {value} {next} {price}
+  drops:
+    material: EYE_OF_ENDER
+    name: '&aUpgrade de Drops'
+    lore:
+      - '&7Cada mob passa a gerar mais drops.'
+      - ''
+      - ' &7Nível: &f{level}/{max}'
+      - ' &7Drops por mob: &b{value} &8-> &b{next}'
+      - ' &7Preço: &6{price}'
+      - ''
+      - '&eClique para comprar.'
+  drops-max:
+    material: EYE_OF_ENDER
+    name: '&aUpgrade de Drops'
+    lore:
+      - ' &7Nível: &f{level}/{max}'
+      - ' &7Drops por mob: &b{value}'
+      - ''
+      - '&cNível máximo.'
+  speed:
+    material: EXPERIENCE_BOTTLE
+    name: '&aUpgrade de Velocidade'
+    lore:
+      - '&7Os mobs são gerados mais rápido.'
+      - ''
+      - ' &7Nível: &f{level}/{max}'
+      - ' &7Tempo de geração: &b{value}s &8-> &b{next}s'
+      - ' &7Preço: &6{price}'
+      - ''
+      - '&eClique para comprar.'
+  speed-max:
+    material: EXPERIENCE_BOTTLE
+    name: '&aUpgrade de Velocidade'
+    lore:
+      - ' &7Nível: &f{level}/{max}'
+      - ' &7Tempo de geração: &b{value}s'
+      - ''
+      - '&cNível máximo.'
+  back:
+    material: ARROW
+    name: '&cVoltar'
+    lore: ['&7Voltar ao menu do gerador.']
+
+friends:
+  title: '&8Amigos - {type}'
+  size: 54
+  slots: [10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34]
+  previous-slot: 45
+  next-slot: 53
+  add-slot: 48
+  back-slot: 49
+  # Placeholder extra: {friend}
+  friend:
+    material: 'head:{friend}'
+    name: '&a{friend}'
+    lore:
+      - ''
+      - '&eBotão direito &7para remover.'
+  add:
+    material: PAPER
+    name: '&aAdicionar amigo'
+    lore: ['&7Clique e digite o nome no chat.']
+  previous:
+    material: ARROW
+    name: '&cAnterior'
+    lore: []
+  next:
+    material: ARROW
+    name: '&aPróxima'
+    lore: []
+  back:
+    material: ARROW
+    name: '&cVoltar'
+    lore: ['&7Voltar ao menu do gerador.']
+
+boosters:
+  title: '&8Boosters - {type}'
+  size: 27
+  back-slot: 22
+  # Placeholders extras: {state} {booster} {multiplier} {time}
+  drops:
+    slot: 11
+    material: EXPERIENCE_BOTTLE
+    name: '&6Booster de Drops'
+    lore:
+      - ''
+      - ' &7Estado: {state}'
+      - ' &7Booster: {booster}'
+      - ' &7Multiplicador: &fx{multiplier}'
+      - ' &7Tempo restante: &f{time}'
+  speed:
+    slot: 13
+    material: SUGAR
+    name: '&bBooster de Velocidade'
+    lore:
+      - ''
+      - ' &7Estado: {state}'
+      - ' &7Booster: {booster}'
+      - ' &7Multiplicador: &fx{multiplier}'
+      - ' &7Tempo restante: &f{time}'
+  sell:
+    slot: 15
+    material: GOLD_NUGGET
+    name: '&aBooster de Venda'
+    lore:
+      - ''
+      - ' &7Estado: {state}'
+      - ' &7Booster: {booster}'
+      - ' &7Multiplicador: &fx{multiplier}'
+      - ' &7Tempo restante: &f{time}'
+  back:
+    material: ARROW
+    name: '&cVoltar'
+    lore: ['&7Voltar ao menu do gerador.']

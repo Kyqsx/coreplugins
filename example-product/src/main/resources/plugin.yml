@@ -1,0 +1,19 @@
+name: Exemplo
+main: com.example.product.ExampleProduct
+version: ${project.version}
+api-version: "1.13"
+authors: [CorePlugins]
+softdepend: [PlaceholderAPI]
+commands:
+  exemplo:
+    description: Comando de exemplo
+    usage: /exemplo [reload]
+    aliases: [ex]
+    permission: exemplo.use
+permissions:
+  exemplo.use:
+    description: Usar /exemplo
+    default: true
+  exemplo.admin:
+    description: Recarregar a configuração
+    default: op

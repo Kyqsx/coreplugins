@@ -1,0 +1,12 @@
+target/
+data/
+products/
+*.iml
+.idea/
+web/node_modules/
+web/dist/
+
+Comandos de inicializ*
+start.ps1
+*.zip
+.env

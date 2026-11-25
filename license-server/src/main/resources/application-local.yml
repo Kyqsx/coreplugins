@@ -1,0 +1,4 @@
+# Perfil SOMENTE para teste local (java -jar ... --spring.profiles.active=local).
+# Sem segredos aqui: defina ADMIN_EMAIL e ADMIN_PASSWORD no ambiente (veja LOCAL.md). Em produção NÃO use este perfil.
+license:
+  admin-require-2fa: false   # local: entra só com e-mail e senha, o que permite os scripts local/seed.*

@@ -1,0 +1,30 @@
+name: coreEconomias
+main: br.com.coreplugins.economias.EconomiasProduct
+version: ${project.version}
+api-version: "1.13"
+authors: [CorePlugins]
+description: Multi economias para servidores de rankup
+softdepend: [Vault, PlaceholderAPI]
+commands:
+  economies:
+    description: Menu e administração das economias
+    usage: /economies <menu|list|reload|help>
+permissions:
+  coreeconomias.*:
+    description: Todas as permissões do coreEconomias (inclui as de cada economia)
+    default: op
+    children:
+      coreeconomias.admin: true
+      coreeconomias.menu: true
+      coreeconomias.player: true
+  coreeconomias.admin:
+    description: Acesso total às economias
+    default: op
+    children:
+      coreeconomias.menu: true
+  coreeconomias.menu:
+    description: Abrir o menu de configuração das economias (/economies)
+    default: op
+  coreeconomias.player:
+    description: Pacote de jogador - comandos comuns (use, look, pay, top) de todas as economias
+    default: false

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>br.com.coreplugins</groupId>
+        <artifactId>coreplugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>coreplugins-loader</artifactId>
+    <name>coreplugins-loader</name>
+    <description>O único jar que o cliente instala em plugins/. Autentica o IP:porta e carrega os produtos da memória.</description>
+
+    <properties>
+        <!-- Compila contra a API mais antiga suportada: se o código usar algo que não existe na 1.8, o build falha.
+             Em servidores mais novos o mesmo jar roda normalmente (o Bukkit mantém compatibilidade retroativa). -->
+        <spigot.version>1.8.8-R0.1-SNAPSHOT</spigot.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.spigotmc</groupId>
+            <artifactId>spigot-api</artifactId>
+            <exclusions>
+                <!-- o spigot-api 1.8.8 aponta para bungeecord-chat:1.8-SNAPSHOT, que não existe mais nos repositórios;
+                     api e loader não usam a API de chat do Bungee -->
+                <exclusion>
+                    <groupId>net.md-5</groupId>
+                    <artifactId>bungeecord-chat</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>br.com.coreplugins</groupId>
+            <artifactId>coreplugins-protocol</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>br.com.coreplugins</groupId>
+            <artifactId>coreplugins-api</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>corePlugins</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>plugin.yml</include>
+                    <include>pluginstore.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>plugin.yml</exclude>
+                    <exclude>pluginstore.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <artifactSet>
+                                <!-- api e protocol entram no loader; o Spigot não -->
+                                <includes>
+                                    <include>br.com.coreplugins:coreplugins-api</include>
+                                    <include>br.com.coreplugins:coreplugins-protocol</include>
+                                </includes>
+                            </artifactSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

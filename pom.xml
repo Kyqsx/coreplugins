@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>br.com.coreplugins</groupId>
+    <artifactId>coreplugins</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>coreplugins</name>
+
+    <modules>
+        <module>protocol</module>
+        <module>api</module>
+        <module>loader</module>
+        <module>license-server</module>
+        <module>produto-coreeconomias</module>
+        <module>produto-corespawners</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- api, loader e produtos compilam para Java 8 (servidores 1.8+ ainda são comuns) -->
+        <maven.compiler.release>8</maven.compiler.release>
+        <spigot.version>1.16.5-R0.1-SNAPSHOT</spigot.version>
+        <!-- URL do license-server embutida no corePlugins.jar. Em produção: -Dlicense.api.url=https://sua-api -->
+        <license.api.url>http://127.0.0.1:8080</license.api.url>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>spigot-repo</id>
+            <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
+        </repository>
+    </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.spigotmc</groupId>
+                <artifactId>spigot-api</artifactId>
+                <version>${spigot.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>br.com.coreplugins</groupId>
+                <artifactId>coreplugins-protocol</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>br.com.coreplugins</groupId>
+                <artifactId>coreplugins-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

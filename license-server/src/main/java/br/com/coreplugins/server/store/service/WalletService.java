@@ -64,6 +64,16 @@ public class WalletService {
         txs.save(new WalletTx(customerId, type, -cents, description, orderId));
     }
 
+    /** Como {@link #debit}, mas devolve false em vez de lançar (não marca a transação como rollback-only). */
+    @Transactional
+    public boolean tryDebit(Long customerId, long cents, String type, String description, Long orderId) {
+        if (cents <= 0 || customers.debit(customerId, cents) == 0) {
+            return false;
+        }
+        txs.save(new WalletTx(customerId, type, -cents, description, orderId));
+        return true;
+    }
+
     /** Ajuste manual do admin: positivo credita, negativo debita (sem deixar o saldo negativo). */
     @Transactional
     public long adjust(Long customerId, long cents, String note) {

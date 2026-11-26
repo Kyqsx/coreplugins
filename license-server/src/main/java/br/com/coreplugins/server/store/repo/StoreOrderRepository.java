@@ -21,8 +21,16 @@ public interface StoreOrderRepository extends JpaRepository<StoreOrder, Long> {
      * não repetem os efeitos (liberar plugin, creditar saldo).
      */
     @Modifying(flushAutomatically = true)
-    @Query("update StoreOrder o set o.status = 'PAID', o.paidAt = :now where o.id = :id and o.status <> 'PAID'")
+    @Query("update StoreOrder o set o.status = 'PAID', o.paidAt = :now where o.id = :id and o.status not in ('PAID', 'CREDITED')")
     int claimPaid(@Param("id") Long id, @Param("now") Instant now);
+
+    /** Troca PENDING por outro estado; só um chamador \"ganha\" (devolve 1), então a devolução do saldo ocorre uma vez. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update StoreOrder o set o.status = :status where o.id = :id and o.status = 'PENDING'")
+    int claimStatus(@Param("id") Long id, @Param("status") String status);
+
+    /** Pedidos pendentes de um cliente cujo prazo já passou. */
+    List<StoreOrder> findByCustomerIdAndStatusAndExpiresAtBefore(Long customerId, String status, Instant now);
 
     /** Usos de um cupom por um cliente: pedidos pagos + pendentes ainda dentro do prazo. */
     @Query("select count(o) from StoreOrder o where o.customerId = :customerId and o.couponId = :couponId "

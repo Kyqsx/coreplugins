@@ -2,13 +2,13 @@ export interface CatalogItem { id: string; name: string; description: string | n
 export interface Session { token: string; id: number; name: string; email: string }
 export interface OrderItem { productId: string; name: string; priceCents: number }
 export interface Order {
-  id: number; status: 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED'; totalCents: number;
+  id: number; status: 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED' | 'CREDITED'; totalCents: number;
   pixCode: string | null; pixQrBase64: string | null; createdAt: string; expiresAt: string; paidAt: string | null;
   items: OrderItem[]; simulated: boolean;
   kind: 'PURCHASE' | 'DEPOSIT'; subtotalCents: number; discountCents: number; bonusCents: number;
-  couponCode: string | null; paidWithBalance: boolean;
+  couponCode: string | null; paidWithBalance: boolean; balanceCents: number;
 }
-export interface Quote { subtotalCents: number; discountCents: number; totalCents: number; couponCode: string | null; balanceCents: number }
+export interface Quote { subtotalCents: number; discountCents: number; totalCents: number; couponCode: string | null; balanceCents: number; balanceUsedCents: number; pixCents: number }
 export interface DepositQuote { amountCents: number; bonusCents: number; creditCents: number; couponCode: string | null }
 export interface WalletTx { id: number; type: string; amountCents: number; description: string | null; orderId: number | null; createdAt: string }
 export interface WalletView { balanceCents: number; transactions: WalletTx[] }

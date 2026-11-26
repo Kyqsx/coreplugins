@@ -1,0 +1,115 @@
+diff a/web/src/App.tsx b/web/src/App.tsx	(rejected hunks)
+@@ -441,8 +454,7 @@
+   const [err, setErr] = useState('');
+   const [wantBalance, setWantBalance] = useState(false);
+   const [busy, setBusy] = useState(false);
+-  // pedido criado: o PIX (QR + copia e cola) aparece aqui mesmo no modal, sem trocar de página
+-  const [order, setOrder] = useState<Order | null>(null);
++  // pedido criado (vem do App): o PIX (QR + copia e cola) aparece no side-box do modal
+   useEffect(() => { api.catalog().then(setCatalog).catch(e => setErr(msg(e))); }, []);
+ 
+   useEffect(() => {
+@@ -463,7 +475,11 @@
+     return () => { alive = false; };
+   }, [cart, coupon, session]);
+ 
+-  const items = (catalog ?? []).filter(p => cart.includes(p.id));
++  const cartItems = (catalog ?? []).filter(p => cart.includes(p.id));
++  // com pedido criado, a coluna de itens continua mostrando o que foi comprado (mesmo depois de o carrinho esvaziar)
++  const items = order && order.status === 'PENDING' ? orderItems : cartItems;
++  // pagamento aprovado: o carrinho já foi esvaziado, então a coluna de itens mostra o carrinho vazio
++  const paid = order?.status === 'PAID' || order?.status === 'CREDITED';
+   const localTotal = items.reduce((s, p) => s + p.priceCents, 0);
+   const subtotal = quote?.subtotalCents ?? localTotal;
+   const discount = quote?.discountCents ?? 0;
+@@ -481,21 +497,21 @@
+   const pay = async () => {
+     if (!session) { onClose(); openAuth('login'); return; }
+     setErr(''); setBusy(true);
+-    try { setOrder(await api.checkout(items.map(p => p.id), coupon || null, useBalance)); }
++    try { const o = await api.checkout(items.map(p => p.id), coupon || null, useBalance); setOrderItems(items); setOrder(o); }
+     catch (x) { setErr(msg(x)); }
+     finally { setBusy(false); }
+   };
+ 
+-  const empty = catalog !== null && items.length === 0;
++  const empty = catalog !== null && items.length === 0 && !order;
+ 
+   return (
+     <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+-      <div className={'modal cart-modal' + (empty && !order ? ' is-empty' : '') + (order ? ' is-order' : '')} role="dialog" aria-modal="true" aria-labelledby="cart-title">
++      <div className={'modal cart-modal' + (empty && !order ? ' is-empty' : '')} role="dialog" aria-modal="true" aria-labelledby="cart-title">
+         <div className="modal-head">
+           <div className="cart-headline">
+             <span className="cart-headico"><i className="fa-solid fa-cart-shopping" aria-hidden="true" /></span>
+             <div>
+-              <h2 id="cart-title">{order ? 'Pagamento' : 'Carrinho'}</h2>
++              <h2 id="cart-title">Carrinho</h2>
+             </div>
+           </div>
+           <button className="icon-btn" onClick={onClose} aria-label="Fechar carrinho" autoFocus><i className="fa-solid fa-xmark" aria-hidden="true" /></button>
+@@ -505,12 +521,6 @@
+           {err && <p className="notice bad" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true" /> {err}</p>}
+           {catalog === null && !err && <p className="muted"><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Carregando…</p>}
+ 
+-          {order && (
+-            // links do pedido (área do cliente, voltar ao carrinho) levam para outra tela: fecha o modal antes
+-            <div onClick={e => { if ((e.target as HTMLElement).closest('a')) onClose(); }}>
+-              <OrderPage id={order.id} initial={order} clearCart={() => setCart([])} embedded />
+-            </div>
+-          )}
+ 
+           {empty && !order && (
+             <div className="cart-empty">
+@@ -520,13 +530,19 @@
+             </div>
+           )}
+ 
+-          {items.length > 0 && !order && (
++          {(items.length > 0 || order) && (
+             <div className="cart-layout">
+               {/* ---------- coluna esquerda: itens ---------- */}
+               <div className="cart-main">
++                {paid ? (
++                  <div className="cart-empty">
++                    <i className="fa-solid fa-cart-shopping" aria-hidden="true" />
++                    <p className="muted">Seu carrinho está vazio.</p>
++                  </div>
++                ) : (<>
+                 <div className="cart-bar">
+-                  <strong>{items.length} {items.length === 1 ? 'item' : 'itens'} no carrinho</strong>
+-                  <button type="button" className="link-danger" onClick={() => setCart([])}>Limpar tudo</button>
++                  <strong>{items.length === 0 ? 'Carrinho vazio' : items.length + (items.length === 1 ? ' item' : ' itens') + ' no carrinho'}</strong>
++                  <button type="button" className="link-danger" disabled={!!order} onClick={() => setCart([])}>Limpar tudo</button>
+                 </div>
+ 
+                 <header className="cart-group-head">
+@@ -547,15 +563,19 @@
+                           {p.category && <span className="muted cart-cat">Plugin - {p.category}</span>}
+                         </div>
+                         <span className="price">{brl(p.priceCents)}</span>
+-                        <button className="icon-btn danger" onClick={() => setCart(cart.filter(x => x !== p.id))} aria-label={'Remover ' + p.name} title="Remover"><i className="fa-solid fa-trash" aria-hidden="true" /></button>
++                        <button className="icon-btn danger" disabled={!!order} onClick={() => setCart(cart.filter(x => x !== p.id))} aria-label={'Remover ' + p.name} title="Remover"><i className="fa-solid fa-trash" aria-hidden="true" /></button>
+                       </li>
+                     ))}
+                   </ul>
+                 </section>
++                </>)}
+               </div>
+ 
+               {/* ---------- coluna direita: pagamento ---------- */}
+               <aside className="cart-side" aria-label="Pagamento">
++                {order ? (
++                  <PixSide order={order} setOrder={setOrder} onClose={onClose} onBack={() => setOrder(null)} />
++                ) : (<>
+                 {total > 0 && (
+                   <section className="side-box">
+                     <h3>Forma de pagamento</h3>
+@@ -611,6 +631,7 @@
+                 </button>
+                 <button type="button" className="link-continue" onClick={() => { onClose(); go('#/'); }}>Continuar comprando</button>
+                 <p className="muted small-note center">Compra segura com pedido registrado na sua conta.</p>
++                </>)}
+               </aside>
+             </div>
+           )}

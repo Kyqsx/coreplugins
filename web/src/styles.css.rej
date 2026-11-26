@@ -1,0 +1,11 @@
+diff a/web/src/styles.css b/web/src/styles.css	(rejected hunks)
+@@ -371,4 +371,7 @@
+ 
+ @media (max-width: 860px) {
+   .cart-layout { grid-template-columns: minmax(0, 1fr); }
+-}
+\ No newline at end of file
++}
++/* side-box do PIX no modal do carrinho */
++.pix-side .qr { justify-self: center; }
++.pix-side .btn.block { text-align: center; }

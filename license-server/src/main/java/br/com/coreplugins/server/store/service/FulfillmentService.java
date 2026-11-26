@@ -47,7 +47,42 @@ public class FulfillmentService {
             return orders.findById(orderId).orElseThrow(); // já estava pago (ou outra chamada acabou de aplicar)
         }
         StoreOrder o = orders.findById(orderId).orElseThrow();
+        if (o.isBalanceRefunded() && o.getPartialBalanceCents() > 0) {
+            // PIX pago depois de o pedido expirar: o saldo reservado já tinha voltado, então precisa ser tirado de novo.
+            if (wallet.tryDebit(o.getCustomerId(), o.getPartialBalanceCents(), WalletTx.PURCHASE,
+                    "Parte paga com saldo (pedido #" + o.getId() + ", PIX pago após expirar)", o.getId())) {
+                o.setBalanceRefunded(false);
+                orders.save(o);
+            } else {
+                // O cliente já gastou esse saldo: o dinheiro do PIX não se perde, vira saldo e o pedido não é liberado.
+                o.setStatus(StoreOrder.CREDITED);
+                orders.save(o);
+                wallet.credit(o.getCustomerId(), o.getTotalCents(), WalletTx.DEPOSIT,
+                        "PIX pago após o pedido #" + o.getId() + " expirar (convertido em saldo)", o.getId());
+                return o;
+            }
+        }
         applyPaidEffects(o);
+        return o;
+    }
+
+    /**
+     * Pagamento misto: cria o pedido PENDENTE e reserva (debita) a parte em saldo numa transação só.
+     * Se o saldo não bastar, nada é gravado. O PIX do restante é gerado depois, pelo chamador.
+     */
+    @Transactional
+    public StoreOrder createPendingWithBalance(Long customerId, List<Product> chosen, int subtotalCents, int discountCents,
+                                               Coupon coupon, int pixCents, int balanceCents, Instant expiresAt) {
+        StoreOrder o = new StoreOrder(customerId, pixCents, expiresAt);
+        o.setPurchase(subtotalCents, discountCents, coupon == null ? null : coupon.getId(),
+                coupon == null ? null : coupon.getCode(), false);
+        o.setPartialBalance(balanceCents);
+        o = orders.save(o);
+        for (Product p : chosen) {
+            items.save(new OrderItem(o.getId(), p.getId(), p.getPriceCents()));
+        }
+        wallet.debit(customerId, balanceCents, WalletTx.PURCHASE,
+                "Parte paga com saldo (pedido #" + o.getId() + ")", o.getId());
         return o;
     }
 
@@ -98,9 +133,14 @@ public class FulfillmentService {
 
     @Transactional
     public void setStatus(Long orderId, String status) {
+        if (orders.claimStatus(orderId, status) == 0) {
+            return; // não estava pendente (ou outra chamada acabou de mudar)
+        }
         StoreOrder o = orders.findById(orderId).orElseThrow();
-        if (StoreOrder.PENDING.equals(o.getStatus())) {
-            o.setStatus(status);
+        if (!o.isDeposit() && o.getPartialBalanceCents() > 0 && !o.isBalanceRefunded()) {
+            wallet.credit(o.getCustomerId(), o.getPartialBalanceCents(), WalletTx.REFUND,
+                    "Saldo devolvido (pedido #" + o.getId() + " não foi pago)", o.getId());
+            o.setBalanceRefunded(true);
             orders.save(o);
         }
     }

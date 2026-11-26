@@ -7,7 +7,7 @@ interface AProduct { id: string; name: string; description: string | null; activ
 interface AImage { id: number; position: number; contentType: string; sizeBytes: number }
 interface AVersion { id: number; productId: string; version: string; sha256: string; sizeBytes: number; createdAt: string }
 interface ACustomer { id: number; name: string; email: string; createdAt: string; balanceCents: number }
-interface AOrder { id: number; customerId: number; customerEmail: string; status: string; totalCents: number; createdAt: string; paidAt: string | null; items: string[]; kind: string; discountCents: number; bonusCents: number; couponCode: string | null; paidWithBalance: boolean }
+interface AOrder { id: number; customerId: number; customerEmail: string; status: string; totalCents: number; createdAt: string; paidAt: string | null; items: string[]; kind: string; discountCents: number; bonusCents: number; couponCode: string | null; paidWithBalance: boolean; balanceCents: number }
 interface ACoupon { id: number; code: string; kind: 'DISCOUNT' | 'DEPOSIT_BONUS'; valueType: 'PERCENT' | 'FIXED'; value: number; minCents: number; capCents: number | null; maxUses: number | null; maxUsesPerCustomer: number | null; usedCount: number; expiresAt: string | null; active: boolean; createdAt: string }
 interface AEntitlement { customerId: number; productId: string; createdAt: string }
 interface AuthResult { step: 'totp' | 'enroll' | 'done'; challenge: string | null; secret: string | null; otpauthUri: string | null; token: string | null; expiresAt: number | null; name: string | null; email: string | null }
@@ -461,7 +461,7 @@ function ProductEditor({ product, onChanged }: { product: AProduct; onChanged: (
 }
 
 // ---------- pedidos ----------
-const STATUS: Record<string, string> = { PENDING: 'Aguardando', PAID: 'Pago', EXPIRED: 'Expirado', CANCELLED: 'Cancelado' };
+const STATUS: Record<string, string> = { PENDING: 'Aguardando', PAID: 'Pago', EXPIRED: 'Expirado', CANCELLED: 'Cancelado', CREDITED: 'Virou saldo' };
 function Orders() {
   const { data, err, ready, reload } = useLoad<AOrder[]>('/orders', []);
   return (
@@ -472,7 +472,7 @@ function Orders() {
       {data.length > 0 && <div className="scroll"><table>
         <thead><tr><th>#</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Status</th><th>Criado</th><th>Pago</th></tr></thead>
         <tbody>{data.map(o => (
-          <tr key={o.id}><td>#{o.id}</td><td>{o.customerEmail}</td><td>{o.items.join(', ')}{o.couponCode ? <><br /><span className="muted">cupom {o.couponCode}{o.discountCents > 0 ? ' (− ' + brl(o.discountCents) + ')' : ''}{o.bonusCents > 0 ? ' (+ ' + brl(o.bonusCents) + ' de bônus)' : ''}</span></> : null}</td><td>{brl(o.totalCents)}{o.paidWithBalance ? <><br /><span className="muted">pago com saldo</span></> : null}</td>
+          <tr key={o.id}><td>#{o.id}</td><td>{o.customerEmail}</td><td>{o.items.join(', ')}{o.couponCode ? <><br /><span className="muted">cupom {o.couponCode}{o.discountCents > 0 ? ' (− ' + brl(o.discountCents) + ')' : ''}{o.bonusCents > 0 ? ' (+ ' + brl(o.bonusCents) + ' de bônus)' : ''}</span></> : null}</td><td>{brl(o.totalCents)}{o.paidWithBalance ? <><br /><span className="muted">pago com saldo</span></> : o.balanceCents > 0 ? <><br /><span className="muted">+ {brl(o.balanceCents)} em saldo</span></> : null}</td>
             <td><span className={'status ' + o.status}>{STATUS[o.status] ?? o.status}</span></td><td>{fmtDate(o.createdAt)}</td><td>{fmtDate(o.paidAt)}</td></tr>))}</tbody>
       </table></div>}
     </div>

@@ -11,6 +11,8 @@ public class StoreOrder {
     public static final String PAID = "PAID";
     public static final String EXPIRED = "EXPIRED";
     public static final String CANCELLED = "CANCELLED";
+    /** PIX pago depois de o pedido expirar, sem saldo para refazer a parte em saldo: o valor virou saldo na carteira. */
+    public static final String CREDITED = "CREDITED";
 
     public static final String KIND_PURCHASE = "PURCHASE";
     public static final String KIND_DEPOSIT = "DEPOSIT";
@@ -54,6 +56,12 @@ public class StoreOrder {
     /** Compra paga com saldo da carteira (sem PIX). */
     @Column(name = "paid_with_balance")
     private Boolean paidWithBalance;
+    /** Pagamento misto: parte do pedido paga com saldo (reservada ao criar); {@code totalCents} fica só com o PIX. */
+    @Column(name = "balance_cents")
+    private Integer balanceCents;
+    /** O saldo reservado já voltou para a carteira (pedido expirou/cancelou). */
+    @Column(name = "balance_refunded")
+    private Boolean balanceRefunded;
 
     protected StoreOrder() {
     }
@@ -88,6 +96,13 @@ public class StoreOrder {
     public Long getCouponId() { return couponId; }
     public String getCouponCode() { return couponCode; }
     public boolean isPaidWithBalance() { return Boolean.TRUE.equals(paidWithBalance); }
+    /** Parte paga com saldo, em qualquer modalidade (total ou mista). */
+    public int getBalanceCents() { return isPaidWithBalance() ? totalCents : (balanceCents == null ? 0 : balanceCents); }
+    /** Só pagamento misto: valor do saldo reservado neste pedido (0 se não for misto). */
+    public int getPartialBalanceCents() { return balanceCents == null ? 0 : balanceCents; }
+    public boolean isBalanceRefunded() { return Boolean.TRUE.equals(balanceRefunded); }
+    public void setBalanceRefunded(boolean v) { this.balanceRefunded = v; }
+    public void setPartialBalance(int cents) { this.balanceCents = cents; }
 
     /** Compra: valores do carrinho e cupom de desconto (se houver). */
     public void setPurchase(int subtotalCents, int discountCents, Long couponId, String couponCode, boolean paidWithBalance) {

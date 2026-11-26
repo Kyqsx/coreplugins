@@ -11,6 +11,7 @@ public class WalletTx {
     public static final String DEPOSIT = "DEPOSIT";
     public static final String BONUS = "BONUS";
     public static final String PURCHASE = "PURCHASE";
+    public static final String REFUND = "REFUND";
     public static final String ADMIN_CREDIT = "ADMIN_CREDIT";
     public static final String ADMIN_DEBIT = "ADMIN_DEBIT";
 

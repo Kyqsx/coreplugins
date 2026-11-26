@@ -46,7 +46,7 @@ public class StoreController {
     public record PasswordReq(String currentPassword, String newPassword) {
     }
 
-    /** {@code useBalance}: paga na hora com o saldo (tudo ou nada). {@code couponCode}: cupom de desconto (opcional). */
+    /** {@code useBalance}: usa o saldo no pagamento (cobre tudo ou, se não bastar, parte, e o resto vai no PIX). {@code couponCode}: cupom de desconto (opcional). */
     public record CheckoutReq(List<String> productIds, String couponCode, Boolean useBalance) {
     }
 
@@ -192,6 +192,7 @@ public class StoreController {
     @GetMapping("/me")
     public Me me(HttpServletRequest req) {
         Customer c = customer(req);
+        orders.releaseExpired(c.getId());
         return new Me(c.getId(), c.getName(), c.getEmail(), wallet.balance(c.getId()));
     }
 
@@ -209,6 +210,7 @@ public class StoreController {
     /** Saldo e extrato da carteira. */
     @GetMapping("/wallet")
     public WalletService.WalletView wallet(HttpServletRequest req) {
+        orders.releaseExpired(customer(req).getId());
         return wallet.view(customer(req).getId());
     }
 

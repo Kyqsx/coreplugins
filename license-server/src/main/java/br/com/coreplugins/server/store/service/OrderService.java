@@ -36,17 +36,23 @@ public class OrderService {
     }
 
     /**
-     * {@code totalCents} é o valor efetivamente cobrado (PIX ou saldo). {@code kind}: PURCHASE ou DEPOSIT.
+     * {@code totalCents} é o valor efetivamente cobrado (PIX ou saldo; em pagamento misto, só a parte do PIX) e
+     * {@code balanceCents} é a parte paga com saldo (em compra 100% no saldo, igual a {@code totalCents}). {@code kind}: PURCHASE ou DEPOSIT.
      * Em depósito, {@code bonusCents} é o extra creditado pelo cupom de bônus.
      */
     public record OrderView(Long id, String status, int totalCents, String pixCode, String pixQrBase64,
                             Instant createdAt, Instant expiresAt, Instant paidAt, List<ItemView> items,
                             boolean simulated, String kind, int subtotalCents, int discountCents, int bonusCents,
-                            String couponCode, boolean paidWithBalance) {
+                            String couponCode, boolean paidWithBalance, int balanceCents) {
     }
 
-    /** Prévia do carrinho com cupom e saldo (tudo calculado no servidor). */
-    public record Quote(int subtotalCents, int discountCents, int totalCents, String couponCode, long balanceCents) {
+    /**
+     * Prévia do carrinho com cupom e saldo (tudo calculado no servidor).
+     * {@code balanceCents} = saldo do cliente; {@code balanceUsedCents} = quanto dele entraria nesta compra (usando
+     * saldo); {@code pixCents} = o que sobraria no PIX.
+     */
+    public record Quote(int subtotalCents, int discountCents, int totalCents, String couponCode, long balanceCents,
+                        int balanceUsedCents, int pixCents) {
     }
 
     public record DepositQuote(int amountCents, int bonusCents, int creditCents, String couponCode) {
@@ -113,6 +119,7 @@ public class OrderService {
 
     /** Mostra subtotal, desconto do cupom e total do carrinho, sem criar nada. */
     public Quote quote(Customer customer, List<String> productIds, String couponCode) {
+        releaseExpired(customer.getId());
         Cart cart = priceCart(customer, productIds);
         int discount = 0;
         String code = null;
@@ -121,15 +128,19 @@ public class OrderService {
             discount = c.compute(cart.subtotalCents());
             code = c.getCode();
         }
-        return new Quote(cart.subtotalCents(), discount, cart.subtotalCents() - discount, code,
-                wallet.balance(customer.getId()));
+        int total = cart.subtotalCents() - discount;
+        long balance = wallet.balance(customer.getId());
+        int used = (int) Math.min(balance, total);
+        return new Quote(cart.subtotalCents(), discount, total, code, balance, used, total - used);
     }
 
     /**
-     * Cria o pedido. Com {@code useBalance} paga na hora com o saldo (tudo ou nada); sem saldo, gera a cobrança PIX.
+     * Cria o pedido. Com {@code useBalance} o saldo entra no pagamento: se cobrir tudo, o pedido é pago na hora; se
+     * cobrir só parte, o saldo é reservado e o resto vai no PIX. Sem saldo, gera a cobrança PIX do total.
      * Se o cupom cobrir 100%, o pedido é liberado na hora, sem cobrar nada.
      */
     public OrderView checkout(Customer customer, List<String> productIds, String couponCode, boolean useBalance) {
+        releaseExpired(customer.getId());
         Cart cart = priceCart(customer, productIds);
         Coupon coupon = null;
         int discount = 0;
@@ -139,13 +150,21 @@ public class OrderService {
         }
         int total = cart.subtotalCents() - discount;
 
-        if (useBalance || total == 0) {
+        long balance = useBalance ? wallet.balance(customer.getId()) : 0;
+        if (total == 0 || (useBalance && balance >= total)) {
             StoreOrder paid = fulfillment.createPaidWithBalance(customer.getId(), cart.products(), cart.subtotalCents(),
                     discount, coupon, total);
             return view(paid);
         }
 
         Instant expires = Instant.now().plus(props.orderExpiresMinutes(), ChronoUnit.MINUTES);
+        if (useBalance && balance > 0) {
+            // pagamento misto: reserva o saldo todo e gera o PIX só do que falta
+            int fromBalance = (int) balance;
+            StoreOrder mixed = fulfillment.createPendingWithBalance(customer.getId(), cart.products(),
+                    cart.subtotalCents(), discount, coupon, total - fromBalance, fromBalance, expires);
+            return view(attachPix(mixed, customer, "CorePlugins - pedido #" + mixed.getId()));
+        }
         StoreOrder order = new StoreOrder(customer.getId(), total, expires);
         order.setPurchase(cart.subtotalCents(), discount, coupon == null ? null : coupon.getId(),
                 coupon == null ? null : coupon.getCode(), false);
@@ -208,7 +227,17 @@ public class OrderService {
         }
     }
 
+    /** Devolve o saldo reservado de pedidos pendentes que já passaram do prazo (consulta o gateway antes de expirar). */
+    public void releaseExpired(Long customerId) {
+        for (StoreOrder o : orders.findByCustomerIdAndStatusAndExpiresAtBefore(customerId, StoreOrder.PENDING, Instant.now())) {
+            if (o.getPartialBalanceCents() > 0) {
+                refresh(o);
+            }
+        }
+    }
+
     public List<OrderView> list(Long customerId) {
+        releaseExpired(customerId);
         List<OrderView> out = new ArrayList<>();
         for (StoreOrder o : orders.findByCustomerIdOrderByCreatedAtDesc(customerId)) {
             out.add(view(o));
@@ -253,7 +282,7 @@ public class OrderService {
             }
             if (StoreOrder.PENDING.equals(o.getStatus())) {
                 refresh(o);
-            } else if (!StoreOrder.PAID.equals(o.getStatus())
+            } else if (!StoreOrder.PAID.equals(o.getStatus()) && !StoreOrder.CREDITED.equals(o.getStatus())
                     && gateway.state(paymentId) == PaymentState.APPROVED) {
                 // Pago depois de o pedido expirar/cancelar aqui: o dinheiro entrou, então o plugin é liberado.
                 log.warn("Pedido {} estava {} mas o pagamento {} foi aprovado; liberando.", o.getId(), o.getStatus(), paymentId);
@@ -304,6 +333,6 @@ public class OrderService {
         return new OrderView(o.getId(), o.getStatus(), o.getTotalCents(), pending ? o.getPixCode() : null,
                 pending ? o.getPixQrBase64() : null, o.getCreatedAt(), o.getExpiresAt(), o.getPaidAt(), list,
                 gateway.simulated(), o.getKind(), o.getSubtotalCents(), o.getDiscountCents(), o.getBonusCents(),
-                o.getCouponCode(), o.isPaidWithBalance());
+                o.getCouponCode(), o.isPaidWithBalance(), o.getBalanceCents());
     }
 }

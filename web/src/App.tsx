@@ -79,7 +79,11 @@ export function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register' | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const openCart = useCallback(() => setCartOpen(true), []);
-  const closeCart = useCallback(() => setCartOpen(false), []);
+  // pedido PIX do carrinho: fica no App para sobreviver ao fechar o modal e esvaziar o carrinho quando for aprovado
+  const [cartOrder, setCartOrder] = useState<Order | null>(null);
+  const [cartOrderItems, setCartOrderItems] = useState<CatalogItem[]>([]);
+  const [paidOrder, setPaidOrder] = useState<Order | null>(null);
+  const closeCart = useCallback(() => { setCartOpen(false); setCartOrder(o => (o && o.status !== 'PENDING' ? null : o)); }, []);
   const openAuth = useCallback((m: 'login' | 'register') => setAuthMode(m), []);
   const closeAuth = useCallback(() => setAuthMode(null), []);
 
@@ -98,8 +102,23 @@ export function App() {
   }, [session, hash, cartOpen]);
 
   const updateCart = (c: string[]) => { setCart(c); saveCart(c); };
+
+  // Enquanto pendente, pergunta de novo a cada 4 s (o servidor consulta o gateway; não depende de webhook).
+  useEffect(() => {
+    if (!cartOrder || cartOrder.status !== 'PENDING') return;
+    const id = cartOrder.id;
+    const t = setInterval(() => { api.order(id).then(o => setCartOrder(cur => (cur && cur.id === id ? o : cur))).catch(() => { /* tenta de novo no próximo ciclo */ }); }, 4000);
+    return () => clearInterval(t);
+  }, [cartOrder?.id, cartOrder?.status]);
+  // pagamento aprovado: esvazia o carrinho (mesmo com o modal fechado), fecha o carrinho e abre o modal de confirmação
+  useEffect(() => {
+    if (cartOrder?.status === 'PAID' && cartOrder.kind === 'PURCHASE') {
+      updateCart([]); setCartOpen(false); setPaidOrder(cartOrder); setCartOrder(null);
+    }
+    /* eslint-disable-next-line */
+  }, [cartOrder?.status]);
   const login = (s: Session) => { setSession(s); setSess(s); };
-  const logout = () => { api.logout().catch(() => { /* sem rede: a sessão local é apagada mesmo assim */ }); setSession(null); setSess(null); go('#/'); };
+  const logout = () => { setCartOrder(null); setPaidOrder(null); api.logout().catch(() => { /* sem rede: a sessão local é apagada mesmo assim */ }); setSession(null); setSess(null); go('#/'); };
 
   const path = hash.replace(/^#/, '');
 
@@ -127,11 +146,11 @@ export function App() {
           </nav>
           <nav className="menu" aria-label="Conta e carrinho">
             <button type="button" className="cart-btn" onClick={openCart} aria-label={`Abrir carrinho${cart.length ? ` (${cart.length} ${cart.length === 1 ? 'item' : 'itens'})` : ''}`}>
-              <i className="fa-solid fa-cart-shopping" aria-hidden="true" /> {cart.length > 0 && <span className="badge">{cart.length}</span>}
+              <i className="fa-solid fa-cart-shopping" aria-hidden="true" />{cart.length > 0 && <span className="badge">{cart.length}</span>}
             </button>
             {session ? (
               <>
-                <a href="#/saldo" className={on('/saldo')}><i className="fa-solid fa-wallet" aria-hidden="true" /> Saldo{balance !== null ? ' ' + brl(balance) : ''}</a>
+                <a href="#/saldo" className={on('/saldo')}><i className="fa-solid fa-wallet" aria-hidden="true" />{balance !== null ? ' ' + brl(balance) : ''}</a>
                 <a href="#/area" className={on('/area')}><i className="fa-solid fa-user" aria-hidden="true" /> Área do Cliente</a>
                 <a href="#/" onClick={e => { e.preventDefault(); logout(); }}><i className="fa-solid fa-right-from-bracket" aria-hidden="true" /> Sair</a>
               </>
@@ -145,7 +164,8 @@ export function App() {
       </header>
       <main className="wrap">{page}</main>
       <Footer />
-      {cartOpen && <CartModal cart={cart} setCart={updateCart} session={session} onClose={closeCart} openAuth={openAuth} />}
+      {cartOpen && <CartModal cart={cart} setCart={updateCart} session={session} onClose={closeCart} openAuth={openAuth} order={cartOrder} setOrder={setCartOrder} orderItems={cartOrderItems} setOrderItems={setCartOrderItems} />}
+      {paidOrder && <PaidModal order={paidOrder} onClose={() => setPaidOrder(null)} />}
       {authMode && <AuthModal mode={authMode} setMode={setAuthMode} onClose={closeAuth} onDone={s => { login(s); closeAuth(); if (cart.length) setCartOpen(true); }} />}
     </>
   );
@@ -187,6 +207,7 @@ function HomePage({ cart, setCart, session, openCart, openAuth }: { cart: string
           <img className="cloud c3" src="/art/cloud.svg" alt="" />
           <img className="isle small" src="/art/island-small.svg" alt="" />
           <img className="isle big" src="/art/island-big.svg" alt="" />
+          <img className="isle mid" src="/art/island-mid.svg" alt="" />
         </div>
         <div className="sky-copy">
           <h1>Plugins para seu servidor de <span>minecraft</span></h1>
@@ -432,17 +453,18 @@ function AuthModal({ mode, setMode, onClose, onDone }: { mode: 'login' | 'regist
     </div>
   );
 }
-function CartModal({ cart, setCart, session, onClose, openAuth }: { cart: string[]; setCart: (c: string[]) => void; session: Session | null; onClose: () => void; openAuth: (m: 'login' | 'register') => void }) {
+function CartModal({ cart, setCart, session, onClose, openAuth, order, setOrder, orderItems, setOrderItems }: { cart: string[]; setCart: (c: string[]) => void; session: Session | null; onClose: () => void; openAuth: (m: 'login' | 'register') => void; order: Order | null; setOrder: (o: Order | null) => void; orderItems: CatalogItem[]; setOrderItems: (i: CatalogItem[]) => void }) {
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [couponInput, setCouponInput] = useState('');
-  const [coupon, setCoupon] = useState('');           // cupom aplicado
+  const [coupon, setCoupon] = useState('');
   const [couponErr, setCouponErr] = useState('');
   const [err, setErr] = useState('');
-  const [busy, setBusy] = useState<'' | 'pix' | 'balance'>('');
+  const [wantBalance, setWantBalance] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // pedido criado (vem do App): o PIX (QR + copia e cola) aparece no side-box do modal
   useEffect(() => { api.catalog().then(setCatalog).catch(e => setErr(msg(e))); }, []);
 
-  // Esc fecha, rolagem da página travada enquanto aberto
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -451,7 +473,6 @@ function CartModal({ cart, setCart, session, onClose, openAuth }: { cart: string
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
   }, [onClose]);
 
-  // prévia do servidor: subtotal, desconto do cupom, total e saldo (só logado)
   useEffect(() => {
     if (!session || cart.length === 0) { setQuote(null); return; }
     let alive = true;
@@ -462,111 +483,243 @@ function CartModal({ cart, setCart, session, onClose, openAuth }: { cart: string
     return () => { alive = false; };
   }, [cart, coupon, session]);
 
-  const items = (catalog ?? []).filter(p => cart.includes(p.id));
+  const cartItems = (catalog ?? []).filter(p => cart.includes(p.id));
+  // com pedido criado, a coluna de itens continua mostrando o que foi comprado (mesmo depois de o carrinho esvaziar)
+  const items = order && order.status === 'PENDING' ? orderItems : cartItems;
+  // pagamento aprovado: o carrinho já foi esvaziado, então a coluna de itens mostra o carrinho vazio
+  const paid = order?.status === 'PAID' || order?.status === 'CREDITED';
   const localTotal = items.reduce((s, p) => s + p.priceCents, 0);
   const subtotal = quote?.subtotalCents ?? localTotal;
   const discount = quote?.discountCents ?? 0;
   const total = quote?.totalCents ?? localTotal;
   const balance = quote?.balanceCents ?? 0;
+  const canBalance = !!session && total > 0 && balance > 0;
+  const useBalance = wantBalance && canBalance;
+  const balanceUsed = useBalance ? Math.min(balance, total) : 0;
+  const pixPart = total - balanceUsed;
+  const fullBalance = useBalance && pixPart === 0;
 
   const applyCoupon = () => { const c = couponInput.trim(); if (!c) return; setCouponErr(''); setCoupon(c); };
   const clearCoupon = () => { setCoupon(''); setCouponInput(''); setCouponErr(''); };
 
-  const pay = async (useBalance: boolean) => {
+  const pay = async () => {
     if (!session) { onClose(); openAuth('login'); return; }
-    setErr(''); setBusy(useBalance ? 'balance' : 'pix');
-    try { const o = await api.checkout(items.map(p => p.id), coupon || null, useBalance); onClose(); go('#/pedido/' + o.id); }
+    setErr(''); setBusy(true);
+    try { const o = await api.checkout(items.map(p => p.id), coupon || null, useBalance); setOrderItems(items); setOrder(o); }
     catch (x) { setErr(msg(x)); }
-    finally { setBusy(''); }
+    finally { setBusy(false); }
   };
+
+  const empty = catalog !== null && items.length === 0 && !order;
 
   return (
     <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="cart-title">
+      <div className={'modal cart-modal' + (empty && !order ? ' is-empty' : '')} role="dialog" aria-modal="true" aria-labelledby="cart-title">
         <div className="modal-head">
-          <h2 id="cart-title"><i className="fa-solid fa-cart-shopping" aria-hidden="true" /> Carrinho</h2>
+          <div className="cart-headline">
+            <span className="cart-headico"><i className="fa-solid fa-cart-shopping" aria-hidden="true" /></span>
+            <div>
+              <h2 id="cart-title">Carrinho</h2>
+            </div>
+          </div>
           <button className="icon-btn" onClick={onClose} aria-label="Fechar carrinho" autoFocus><i className="fa-solid fa-xmark" aria-hidden="true" /></button>
         </div>
+
         <div className="modal-body">
           {err && <p className="notice bad" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true" /> {err}</p>}
           {catalog === null && !err && <p className="muted"><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Carregando…</p>}
-          {catalog !== null && items.length === 0 && (
+
+
+          {empty && !order && (
             <div className="cart-empty">
               <i className="fa-solid fa-cart-shopping" aria-hidden="true" />
               <p className="muted">Seu carrinho está vazio.</p>
               <button className="btn primary" onClick={() => { onClose(); go('#/'); }}><i className="fa-solid fa-puzzle-piece" aria-hidden="true" /> Ver plugins</button>
             </div>
           )}
-          {items.length > 0 && (
-            <ul className="cart-list">
-              {items.map(p => (
-                <li key={p.id}>
-                  <span className="cart-name">{p.name}</span>
-                  <span className="price">{brl(p.priceCents)}</span>
-                  <button className="icon-btn danger" onClick={() => setCart(cart.filter(x => x !== p.id))} aria-label={'Remover ' + p.name} title="Remover"><i className="fa-solid fa-trash" aria-hidden="true" /></button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {items.length > 0 && session && (
-            <div className="coupon-box">
-              {quote?.couponCode ? (
-                <div className="coupon-applied"><span><i className="fa-solid fa-ticket" aria-hidden="true" /> Cupom <b>{quote.couponCode}</b> aplicado</span>
-                  <button className="icon-btn" onClick={clearCoupon} aria-label="Remover cupom" title="Remover cupom"><i className="fa-solid fa-xmark" aria-hidden="true" /></button></div>
-              ) : (
-                <div className="row">
-                  <input type="text" value={couponInput} onChange={e => setCouponInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyCoupon(); }} placeholder="Cupom de desconto" aria-label="Cupom de desconto" maxLength={32} autoCapitalize="characters" style={{ flex: 1, minWidth: 0 }} />
-                  <button className="btn small" onClick={applyCoupon} disabled={!couponInput.trim()}>Aplicar</button>
-                </div>
-              )}
-              {couponErr && <p className="notice bad" role="alert">{couponErr}</p>}
+
+          {(items.length > 0 || order) && (
+            <div className="cart-layout">
+              {/* ---------- coluna esquerda: itens ---------- */}
+              <div className="cart-main">
+                {paid ? (
+                  <div className="cart-empty">
+                    <i className="fa-solid fa-cart-shopping" aria-hidden="true" />
+                    <p className="muted">Seu carrinho está vazio.</p>
+                  </div>
+                ) : (<>
+                  <div className="cart-bar">
+                    <strong>{items.length === 0 ? 'Carrinho vazio' : items.length + (items.length === 1 ? ' item' : ' itens') + ' no carrinho'}</strong>
+                    <button type="button" className="link-danger" disabled={!!order} onClick={() => setCart([])}>Limpar tudo</button>
+                  </div>
+
+                  <header className="cart-group-head">
+                    <h3>CorePlugins</h3>
+                    <span className="tag">Plugins oficiais</span>
+                  </header>
+                  <section className="cart-group" aria-label="Itens do carrinho">
+                    <ul className="cart-list">
+                      {items.map(p => (
+                        <li key={p.id}>
+                          <span className="cart-thumb">
+                            {p.images.length > 0
+                              ? <img src={imageUrl(p.id, p.images[0])} alt="" loading="lazy" decoding="async" />
+                              : <PixelIcon id={p.id} cat={p.category} />}
+                          </span>
+                          <div className="cart-info">
+                            <span className="cart-name">{p.name}</span>
+                            {p.category && <span className="muted cart-cat">Plugin - {p.category}</span>}
+                          </div>
+                          <span className="price">{brl(p.priceCents)}</span>
+                          <button className="icon-btn danger" disabled={!!order} onClick={() => setCart(cart.filter(x => x !== p.id))} aria-label={'Remover ' + p.name} title="Remover"><i className="fa-solid fa-trash" aria-hidden="true" /></button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                </>)}
+              </div>
+
+              {/* ---------- coluna direita: pagamento ---------- */}
+              <aside className="cart-side" aria-label="Pagamento">
+                {order ? (
+                  <PixSide order={order} setOrder={setOrder} onClose={onClose} onBack={() => setOrder(null)} />
+                ) : (<>
+                  {total > 0 && (
+                    <section className="side-box">
+                      <h3>Forma de pagamento</h3>
+
+
+
+                      <div className="pay-grid">
+                        <button type="button" className={'pay-opt balance' + (useBalance ? ' on' : '')} role="switch" aria-checked={useBalance}
+                          disabled={!canBalance} onClick={() => setWantBalance(v => !v)}>
+                          <span><b>Usar saldo</b><small>{session ? brl(balance) + (balance > 0 && balance < total ? ' · o resto vai no PIX' : '') : 'Entre para usar'}</small></span>
+                          <span className="radio" aria-hidden="true" />
+                        </button>
+                        <button type="button" className={'pay-opt' + (pixPart > 0 ? ' on' : '')} disabled={fullBalance || total === 0} aria-pressed={pixPart > 0} onClick={() => setWantBalance(false)}>
+                          <i className="fa-brands fa-pix" aria-hidden="true" /> PIX{balanceUsed > 0 && pixPart > 0 ? ' (restante)' : ''}
+                        </button>
+                      </div>
+
+                      {total === 0 && <p className="muted small-note">Total zerado: não é preciso pagar, é só finalizar o pedido.</p>}
+                    </section>
+                  )}
+
+                  {session && (
+                    <section className="side-box">
+                      <h3>Cupom de desconto</h3>
+                      {quote?.couponCode ? (
+                        <div className="coupon-applied"><span><i className="fa-solid fa-ticket" aria-hidden="true" /> Cupom <b>{quote.couponCode}</b> aplicado</span>
+                          <button className="icon-btn" onClick={clearCoupon} aria-label="Remover cupom" title="Remover cupom"><i className="fa-solid fa-xmark" aria-hidden="true" /></button></div>
+                      ) : (
+                        <div className="row nowrap">
+                          <input type="text" value={couponInput} onChange={e => setCouponInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyCoupon(); }} placeholder="Digite seu cupom" aria-label="Cupom de desconto" maxLength={32} autoCapitalize="characters" style={{ flex: 1, minWidth: 0 }} />
+                          <button className="btn small" onClick={applyCoupon} disabled={!couponInput.trim()}>Aplicar</button>
+                        </div>
+                      )}
+                      {couponErr && <p className="notice bad" role="alert">{couponErr}</p>}
+                    </section>
+                  )}
+
+                  <section className="side-box summary">
+                    <h3>Resumo</h3>
+                    <div className="row between"><span className="muted">Subtotal loja</span><span>{brl(subtotal)}</span></div>
+                    {discount > 0 && <div className="row between"><span className="muted">Desconto ({quote?.couponCode})</span><span className="disc">− {brl(discount)}</span></div>}
+                    <div className="row between"><span className="muted">Total</span><span>{brl(total)}</span></div>
+                    {balanceUsed > 0 && <div className="row between"><span className="muted">Pago com saldo</span><span className="disc">− {brl(balanceUsed)}</span></div>}
+                    <div className="row between total-line"><strong>{balanceUsed > 0 ? 'Total no PIX' : 'Total a pagar'}</strong><span className="price big">{brl(pixPart)}</span></div>
+                  </section>
+
+                  <button className="btn primary block" onClick={pay} disabled={busy}>
+                    {busy
+                      ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Finalizando…</>
+                      : !session ? <><i className="fa-solid fa-right-to-bracket" aria-hidden="true" /> Entrar para pagar</>
+                        : total === 0 ? <><i className="fa-solid fa-check" aria-hidden="true" /> Finalizar pedido</>
+                          : <>Finalizar compra</>}
+                  </button>
+                  <button type="button" className="link-continue" onClick={() => { onClose(); go('#/'); }}>Continuar comprando</button>
+                </>)}
+              </aside>
             </div>
           )}
         </div>
-        {items.length > 0 && (
-          <div className="modal-foot">
-            {discount > 0 && (
-              <>
-                <div className="row between"><span className="muted">Subtotal</span><span>{brl(subtotal)}</span></div>
-                <div className="row between"><span className="muted">Desconto ({quote?.couponCode})</span><span className="disc">− {brl(discount)}</span></div>
-              </>
-            )}
-            <div className="row between"><strong>Total</strong><span className="price">{brl(total)}</span></div>
-            {total === 0 ? (
-              <button className="btn primary" onClick={() => pay(false)} disabled={busy !== ''}>
-                {busy ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Finalizando…</> : <><i className="fa-solid fa-check" aria-hidden="true" /> Finalizar pedido</>}
-              </button>
-            ) : (
-              <>
-                <button className="btn primary" onClick={() => pay(false)} disabled={busy !== ''}>
-                  {busy === 'pix'
-                    ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Gerando PIX…</>
-                    : session
-                      ? <><i className="fa-brands fa-pix" aria-hidden="true" /> Pagar com PIX</>
-                      : <><i className="fa-solid fa-right-to-bracket" aria-hidden="true" /> Entrar para pagar</>}
-                </button>
-                {session && (
-                  <>
-                    <button className="btn" onClick={() => pay(true)} disabled={busy !== '' || balance < total}>
-                      {busy === 'balance'
-                        ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Pagando…</>
-                        : <><i className="fa-solid fa-wallet" aria-hidden="true" /> Pagar com saldo ({brl(balance)})</>}
-                    </button>
-                    {balance < total && <p className="muted" style={{ textAlign: 'center' }}>Saldo insuficiente. <a href="#/saldo" onClick={onClose}>Depositar</a></p>}
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
+// ---------- modal de pagamento aprovado ----------
+function PaidModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal paid-modal" role="dialog" aria-modal="true" aria-labelledby="paid-title">
+        <img className="deco deco-br" src="/art/island-big.svg" alt="" aria-hidden="true" />
+        <div className="modal-head">
+          <h2 id="paid-title"><i className="fa-solid fa-circle-check" aria-hidden="true" /> {order.paidWithBalance ? 'Compra concluída!' : 'Pagamento confirmado!'}</h2>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Fechar" autoFocus><i className="fa-solid fa-xmark" aria-hidden="true" /></button>
+        </div>
+        <div className="modal-body">
+          <p>{order.paidWithBalance ? 'Sua compra foi paga com o saldo.' : 'Recebemos o seu PIX.'} Seus plugins já estão na sua conta.</p>
+          <p className="muted">Pedido #{order.id}</p>
+        </div>
+        <div className="modal-foot">
+          <a className="btn primary" href="#/area" onClick={onClose}>Ir para a Área do Cliente</a>
+          <button type="button" className="link-continue" onClick={() => { onClose(); go('#/'); }}>Continuar comprando</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- side-box do PIX (dentro do modal do carrinho) ----------
+function PixSide({ order, setOrder, onClose, onBack }: { order: Order; setOrder: (o: Order) => void; onClose: () => void; onBack: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const [err, setErr] = useState('');
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(order.pixCode ?? ''); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* selecione manualmente */ }
+  };
+  const simulate = async () => { try { setOrder(await api.simulatePay(order.id)); } catch (x) { setErr(msg(x)); } };
+
+  if (order.status === 'PENDING' && (order.pixCode || order.pixQrBase64)) {
+    return (
+      <section className="side-box pix-side">
+        <h3>Pedido #{order.id}</h3>
+        {order.pixQrBase64 && <img className="qr" alt="QR Code PIX" src={'data:image/png;base64,' + order.pixQrBase64} />}
+        {order.pixCode && <div className="pix" tabIndex={0}>{order.pixCode}</div>}
+        <button type="button" className="btn primary block" onClick={copy}><i className={copied ? 'fa-solid fa-check' : 'fa-regular fa-copy'} aria-hidden="true" /> {copied ? 'Copiado!' : 'Copiar código'}</button>
+        {order.simulated && <button type="button" className="btn block" onClick={simulate}>Simular pagamento (modo teste)</button>}
+        {err && <p className="notice bad" role="alert">{err}</p>}
+      </section>
+    );
+  }
+  // sem PIX para mostrar: convertido em saldo, expirado ou cancelado (o pago abre o PaidModal)
+  return (
+    <section className="side-box pix-side">
+      <h3>Pedido #{order.id}</h3>
+      {order.status === 'CREDITED' && (
+        <><p><strong>Valor convertido em saldo.</strong></p>
+          <a className="btn primary block" href="#/saldo" onClick={onClose}>Ver meu saldo</a></>
+      )}
+      {(order.status === 'EXPIRED' || order.status === 'CANCELLED') && (
+        <><p className="muted">Este pedido não está mais ativo.</p>
+          <button type="button" className="btn primary block" onClick={onBack}>Voltar ao carrinho</button></>
+      )}
+      {order.status === 'PENDING' && <p className="muted">Pedido registrado.</p>}
+    </section>
+  );
+}
+
 // ---------- pedido / PIX ----------
-function OrderPage({ id, clearCart }: { id: number; clearCart: () => void }) {
-  const [order, setOrder] = useState<Order | null>(null);
+function OrderPage({ id, clearCart, initial, embedded }: { id: number; clearCart: () => void; initial?: Order; embedded?: boolean }) {
+  const [order, setOrder] = useState<Order | null>(initial ?? null);
   const [err, setErr] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -592,7 +745,7 @@ function OrderPage({ id, clearCart }: { id: number; clearCart: () => void }) {
 
   return (
     <div className="stack">
-      <div className="row between"><h2>{deposit ? 'Depósito' : 'Pedido'} #{order.id}</h2><span className={'status ' + order.status}>{label(order.status)}</span></div>
+      <div className="row between">{embedded ? <h3>{deposit ? 'Depósito' : 'Pedido'} #{order.id}</h3> : <h2>{deposit ? 'Depósito' : 'Pedido'} #{order.id}</h2>}<span className={'status ' + order.status}>{label(order.status)}</span></div>
       <div className="scroll"><table><tbody>
         {deposit ? (
           <>
@@ -609,7 +762,8 @@ function OrderPage({ id, clearCart }: { id: number; clearCart: () => void }) {
                 <tr><td>Desconto{order.couponCode ? ' (cupom ' + order.couponCode + ')' : ''}</td><td className="price disc">− {brl(order.discountCents)}</td></tr>
               </>
             )}
-            <tr><td><strong>Total{order.paidWithBalance ? ' (pago com saldo)' : ''}</strong></td><td className="price">{brl(order.totalCents)}</td></tr>
+            {order.balanceCents > 0 && !order.paidWithBalance && <tr><td>Pago com saldo</td><td className="price disc">− {brl(order.balanceCents)}</td></tr>}
+            <tr><td><strong>{order.balanceCents > 0 && !order.paidWithBalance ? 'Total no PIX' : 'Total' + (order.paidWithBalance ? ' (pago com saldo)' : '')}</strong></td><td className="price">{brl(order.totalCents)}</td></tr>
           </>
         )}
       </tbody></table></div>
@@ -642,18 +796,21 @@ function OrderPage({ id, clearCart }: { id: number; clearCart: () => void }) {
           )}
         </section>
       )}
+      {order.status === 'CREDITED' && (
+        <section className="notice warn"><p>Seu PIX caiu depois de o pedido expirar e o saldo usado nele já tinha sido gasto, então o valor pago foi para o seu saldo. <a href="#/saldo">Ver meu saldo</a></p></section>
+      )}
       {(order.status === 'EXPIRED' || order.status === 'CANCELLED') && (
-        <section className="notice bad"><p>Este pedido não está mais ativo. {deposit
+        <section className="notice bad"><p>Este pedido não está mais ativo.{order.balanceCents > 0 && !order.paidWithBalance ? ' O saldo reservado voltou para a sua carteira.' : ''} {deposit
           ? <a href="#/saldo"><i className="fa-solid fa-arrow-left" aria-hidden="true" /> Fazer outro depósito</a>
           : <a href="#/carrinho"><i className="fa-solid fa-arrow-left" aria-hidden="true" /> Voltar ao carrinho</a>}</p></section>
       )}
     </div>
   );
 }
-const label = (s: Order['status']) => ({ PENDING: 'Aguardando pagamento', PAID: 'Pago', EXPIRED: 'Expirado', CANCELLED: 'Cancelado' }[s]);
+const label = (s: Order['status']) => ({ PENDING: 'Aguardando pagamento', PAID: 'Pago', EXPIRED: 'Expirado', CANCELLED: 'Cancelado', CREDITED: 'Convertido em saldo' }[s]);
 
 // ---------- saldo / depósito ----------
-const TX_LABEL: Record<string, string> = { DEPOSIT: 'Depósito', BONUS: 'Bônus', PURCHASE: 'Compra', ADMIN_CREDIT: 'Crédito', ADMIN_DEBIT: 'Débito' };
+const TX_LABEL: Record<string, string> = { DEPOSIT: 'Depósito', BONUS: 'Bônus', PURCHASE: 'Compra', REFUND: 'Estorno', ADMIN_CREDIT: 'Crédito', ADMIN_DEBIT: 'Débito' };
 const PRESETS = [10, 25, 50, 100];
 
 function WalletPage() {

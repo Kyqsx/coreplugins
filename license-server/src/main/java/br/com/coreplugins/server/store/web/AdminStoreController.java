@@ -36,7 +36,7 @@ public class AdminStoreController {
 
     public record OrderRow(Long id, Long customerId, String customerEmail, String status, int totalCents,
                            Instant createdAt, Instant paidAt, List<String> items, String kind, int discountCents,
-                           int bonusCents, String couponCode, boolean paidWithBalance) {
+                           int bonusCents, String couponCode, boolean paidWithBalance, int balanceCents) {
     }
 
     public record CouponRow(Long id, String code, String kind, String valueType, int value, int minCents, Integer capCents,
@@ -107,7 +107,7 @@ public class AdminStoreController {
             }
             out.add(new OrderRow(o.getId(), o.getCustomerId(), email, o.getStatus(), o.getTotalCents(),
                     o.getCreatedAt(), o.getPaidAt(), names, o.getKind(), o.getDiscountCents(), o.getBonusCents(),
-                    o.getCouponCode(), o.isPaidWithBalance()));
+                    o.getCouponCode(), o.isPaidWithBalance(), o.getBalanceCents()));
         }
         return out;
     }

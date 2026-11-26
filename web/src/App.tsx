@@ -207,7 +207,6 @@ function HomePage({ cart, setCart, session, openCart, openAuth }: { cart: string
           <img className="cloud c3" src="/art/cloud.svg" alt="" />
           <img className="isle small" src="/art/island-small.svg" alt="" />
           <img className="isle big" src="/art/island-big.svg" alt="" />
-          <img className="isle mid" src="/art/island-mid.svg" alt="" />
         </div>
         <div className="sky-copy">
           <h1>Plugins para seu servidor de <span>minecraft</span></h1>

@@ -14,6 +14,7 @@ public class WalletTx {
     public static final String REFUND = "REFUND";
     public static final String ADMIN_CREDIT = "ADMIN_CREDIT";
     public static final String ADMIN_DEBIT = "ADMIN_DEBIT";
+    public static final String CHECKIN = "CHECKIN";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

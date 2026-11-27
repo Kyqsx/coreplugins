@@ -70,6 +70,23 @@ No painel admin (**Produtos > Gerenciar > Imagens e vídeo**) cada plugin ganha:
 Cada plugin passa a ter uma página própria, `#/plugin/<id>`: é o link para colocar na descrição do vídeo. A tabela
 `product_images` e a coluna `products.youtube_id` são criadas sozinhas pelo `ddl-auto: update`.
 
+### Área do Cliente (sidebar)
+
+`#/area` tem sidebar com **Início**, **Meus plugins**, **Servidores**, **Pedidos** e **Saldo** (`#/saldo`). O Início reúne:
+
+- **Check-in diário** (`GET/POST /api/store/checkin`): um por cliente por dia, no fuso de Brasília; o prêmio entra no saldo da
+  carteira (extrato: "Check-in"). Configuração no painel admin, aba **Check-in**: ligar/desligar, valor de cada dia da sequência
+  (1 a 31 dias, até R$ 500 cada; depois do último a sequência de prêmios recomeça) e se faltar um dia zera a sequência.
+  **Vem desligado** até você ativar. Tabelas `checkin_config` e `checkins` são criadas pelo `ddl-auto: update`.
+- **Download do `corePlugins.jar`** (`GET /api/store/loader/download`, exige login). Você envia o jar do build final no painel
+  admin (aba **Resumo > corePlugins.jar para download**) e ele fica guardado no banco, como os jars dos produtos: funciona em
+  qualquer hospedagem e com várias instâncias, sem depender de disco. Sem upload, em desenvolvimento, o servidor cai para
+  `LOADER_JAR_PATH` ou `loader/target/corePlugins.jar`. Reenvie o jar sempre que gerar um loader novo. Tabela `loader_jars`.
+- **Plugins sem servidor**: comprados e não marcados em nenhum servidor, com atribuição rápida (usa `PUT /servers/{id}/products`).
+- **Novidades** (`GET /api/store/updates`): versões publicadas dos plugins que o cliente comprou, com as notas da versão. As notas
+  (coluna `product_versions.changelog`, até 4000 caracteres, texto puro) são escritas no painel admin ao **enviar** ou **editar**
+  uma versão. Versões ainda não liberadas como "mais recente" não aparecem.
+
 ## Build
 
 Requisitos: JDK 21 e Maven 3.9+.

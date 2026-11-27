@@ -19,6 +19,9 @@ public class ProductVersion {
     private long sizeBytes;
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
+    /** Notas da versão (texto puro), mostradas aos clientes em "Novidades" na Área do Cliente. Null = sem notas. */
+    @Column(length = 4000)
+    private String changelog;
 
     protected ProductVersion() {
     }
@@ -36,6 +39,8 @@ public class ProductVersion {
     public String getSha256() { return sha256; }
     public long getSizeBytes() { return sizeBytes; }
     public Instant getCreatedAt() { return createdAt; }
+    public String getChangelog() { return changelog; }
+    public void setChangelog(String changelog) { this.changelog = changelog; }
     public void setVersion(String version) { this.version = version; }
     public void setSha256(String sha256) { this.sha256 = sha256; }
     public void setSizeBytes(long sizeBytes) { this.sizeBytes = sizeBytes; }

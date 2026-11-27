@@ -133,8 +133,19 @@ public class AdminController {
     @PostMapping(value = "/products/{id}/versions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ProductVersion upload(@PathVariable String id, @RequestParam String version,
                                  @RequestParam(defaultValue = "true") boolean latest,
+                                 @RequestParam(required = false) String changelog,
                                  @RequestParam("file") MultipartFile file) throws IOException {
-        return productService.addVersion(id, version, file, latest);
+        return productService.addVersion(id, version, file, latest, changelog);
+    }
+
+    public record ChangelogReq(String changelog) {
+    }
+
+    /** Notas da versão (as que aparecem em "Novidades" para quem comprou o plugin). */
+    @PutMapping("/products/{id}/versions/{version}/changelog")
+    public ProductVersion setChangelog(@PathVariable String id, @PathVariable String version,
+                                       @RequestBody ChangelogReq r) {
+        return productService.setChangelog(id, version, r.changelog());
     }
 
     /** Edita a versão: novo número e/ou novo jar (ambos opcionais, mas ao menos um). */

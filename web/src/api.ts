@@ -18,6 +18,10 @@ export interface VersionView { version: string; createdAt: string }
 export interface LibraryItem extends Omit<CatalogItem, 'images' | 'youtubeId'> { versions: VersionView[] }
 /** version vazia/null = acompanhar a mais recente */
 export interface Selection { productId: string; version: string | null }
+export interface CheckinView { enabled: boolean; claimedToday: boolean; streak: number; dayInCycle: number; rewardsCents: number[]; todayRewardCents: number }
+export interface CheckinClaim { rewardCents: number; streak: number; dayInCycle: number; balanceCents: number }
+export interface UpdateItem { productId: string; productName: string; category: string | null; version: string; changelog: string | null; createdAt: string; latest: boolean }
+export interface LoaderInfo { available: boolean; sizeBytes: number; updatedAt: string | null }
 export interface ServerView { id: number; customerId: number; ip: string; port: number; label: string | null; active: boolean; lastSeenAt: string | null; products: Grant[] }
 
 /** URL pública de uma imagem da galeria do plugin (a primeira da lista `images` é a capa). */
@@ -77,7 +81,36 @@ export const api = {
   createServer: (ip: string, port: number, label: string) => call<ServerView>('POST', '/servers', { ip, port, label }),
   changeAddress: (id: number, ip: string, port: number) => call<ServerView>('PUT', '/servers/' + id + '/address', { ip, port }),
   setProducts: (id: number, products: Selection[]) => call<ServerView>('PUT', '/servers/' + id + '/products', { products }),
+  checkin: () => call<CheckinView>('GET', '/checkin'),
+  claimCheckin: () => call<CheckinClaim>('POST', '/checkin'),
+  updates: () => call<UpdateItem[]>('GET', '/updates'),
+  loaderInfo: () => call<LoaderInfo>('GET', '/loader'),
 };
+
+/**
+ * Baixa o corePlugins.jar. A rota exige login (token no cabeçalho), então um <a href> não serve:
+ * busca o arquivo com o token e entrega ao navegador como download.
+ */
+export async function downloadLoader(): Promise<void> {
+  const s = getSession();
+  let res: Response;
+  try {
+    res = await fetch('/api/store/loader/download', { headers: s ? { Authorization: 'Bearer ' + s.token } : {} });
+  } catch {
+    throw new ApiError(0, 'Não foi possível falar com o servidor da loja.');
+  }
+  if (!res.ok) {
+    if (res.status === 401 && s) { setSession(null); window.dispatchEvent(new Event('coreplugins-logout')); }
+    let text = 'Não foi possível baixar o arquivo (' + res.status + ').';
+    try { const d = await res.json() as { error?: string }; if (d.error) text = d.error; } catch { /* sem corpo */ }
+    throw new ApiError(res.status, text);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url; a.download = 'corePlugins.jar';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 
 /** "29,90" ou "29.90" -> 2990 (centavos). null se inválido. */
 export function parseBRL(t: string): number | null {

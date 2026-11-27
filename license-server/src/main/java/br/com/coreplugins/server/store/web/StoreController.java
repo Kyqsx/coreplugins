@@ -8,21 +8,26 @@ import br.com.coreplugins.server.repo.ProductRepository;
 import br.com.coreplugins.server.repo.ProductVersionRepository;
 import br.com.coreplugins.server.service.AdminService;
 import br.com.coreplugins.server.service.ClientIp;
+import br.com.coreplugins.server.service.LoaderService;
 import br.com.coreplugins.server.service.ProductService;
 import br.com.coreplugins.server.store.model.Entitlement;
 import br.com.coreplugins.server.store.repo.EntitlementRepository;
 import br.com.coreplugins.server.store.security.UserAuthFilter;
 import br.com.coreplugins.server.store.service.AuthService;
+import br.com.coreplugins.server.store.service.CheckinService;
 import br.com.coreplugins.server.store.service.OrderService;
 import br.com.coreplugins.server.store.service.StoreServerService;
 import br.com.coreplugins.server.store.service.WalletService;
+import br.com.coreplugins.server.web.ApiException;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
@@ -87,6 +92,15 @@ public class StoreController {
     public record Me(Long id, String name, String email, long balanceCents) {
     }
 
+    /** Uma versão publicada de um plugin que o cliente comprou, com as notas ({@code changelog}, pode ser null). */
+    public record UpdateView(String productId, String productName, String category, String version,
+            String changelog, Instant createdAt, boolean latest) {
+    }
+
+    /** O corePlugins.jar (o loader) que o cliente instala: se há arquivo para baixar, o tamanho e a data dele. */
+    public record LoaderInfo(boolean available, long sizeBytes, Instant updatedAt) {
+    }
+
     private final AuthService auth;
     private final OrderService orders;
     private final StoreServerService servers;
@@ -96,11 +110,13 @@ public class StoreController {
     private final LicenseProperties props;
     private final WalletService wallet;
     private final ProductService productService;
+    private final CheckinService checkin;
+    private final LoaderService loader;
 
     public StoreController(AuthService auth, OrderService orders, StoreServerService servers,
             ProductRepository products, EntitlementRepository entitlements,
             ProductVersionRepository versions, LicenseProperties props, WalletService wallet,
-            ProductService productService) {
+            ProductService productService, CheckinService checkin, LoaderService loader) {
         this.auth = auth;
         this.orders = orders;
         this.servers = servers;
@@ -110,6 +126,8 @@ public class StoreController {
         this.props = props;
         this.wallet = wallet;
         this.productService = productService;
+        this.checkin = checkin;
+        this.loader = loader;
     }
 
     // ---- público
@@ -255,6 +273,73 @@ public class StoreController {
             });
         }
         return out;
+    }
+
+    /**
+     * Novidades: versões publicadas dos plugins que o cliente comprou, da mais nova para a mais antiga (até 20).
+     * Versões enviadas depois da "mais recente" (ainda não liberadas) não aparecem.
+     */
+    @GetMapping("/updates")
+    public List<UpdateView> updates(HttpServletRequest req) {
+        List<UpdateView> out = new ArrayList<>();
+        for (Entitlement e : entitlements.findByCustomerId(customer(req).getId())) {
+            products.findById(e.getProductId()).ifPresent(p -> {
+                List<ProductVersion> vs = versions.findByProductIdOrderByCreatedAtDesc(p.getId());
+                Instant released = null;
+                for (ProductVersion v : vs) {
+                    if (v.getVersion().equals(p.getLatestVersion())) {
+                        released = v.getCreatedAt();
+                    }
+                }
+                for (ProductVersion v : vs) {
+                    if (released != null && !v.getCreatedAt().isAfter(released)) {
+                        out.add(new UpdateView(p.getId(), p.getName(), p.getCategory(), v.getVersion(), v.getChangelog(),
+                                v.getCreatedAt(), v.getVersion().equals(p.getLatestVersion())));
+                    }
+                }
+            });
+        }
+        out.sort((a, b) -> b.createdAt().compareTo(a.createdAt()));
+        return out.size() > 20 ? new ArrayList<>(out.subList(0, 20)) : out;
+    }
+
+    // ---- check-in diário
+
+    @GetMapping("/checkin")
+    public CheckinService.View checkinView(HttpServletRequest req) {
+        return checkin.view(customer(req).getId());
+    }
+
+    @PostMapping("/checkin")
+    public CheckinService.Claimed checkinClaim(HttpServletRequest req) {
+        Long id = customer(req).getId();
+        try {
+            return checkin.claim(id);
+        } catch (DataIntegrityViolationException e) {
+            // dois cliques ao mesmo tempo: o segundo bateu na restrição (cliente, dia) e nada foi creditado
+            throw ApiException.bad("Você já fez o check-in de hoje. Volte amanhã!");
+        }
+    }
+
+    // ---- download do loader (corePlugins.jar). Exige login: não está na lista de rotas públicas do UserAuthFilter.
+
+    @GetMapping("/loader")
+    public LoaderInfo loaderInfo() {
+        LoaderService.Info i = loader.info();
+        return new LoaderInfo(i.available(), i.sizeBytes(), i.updatedAt());
+    }
+
+    @GetMapping("/loader/download")
+    public ResponseEntity<byte[]> loaderDownload() throws IOException {
+        byte[] data = loader.bytes()
+                .orElseThrow(() -> ApiException.notFound("O corePlugins.jar ainda não está disponível para download."));
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/java-archive"))
+                .contentLength(data.length)
+                .cacheControl(CacheControl.noStore())
+                .header("Content-Disposition", "attachment; filename=\"corePlugins.jar\"")
+                .header("X-Content-Type-Options", "nosniff")
+                .body(data);
     }
 
     @GetMapping("/servers")

@@ -5,7 +5,9 @@ import type { ServerView } from './api';
 // ---------- API de administração (login de admin + 2FA; sessão Bearer curta, só na aba, em sessionStorage) ----------
 interface AProduct { id: string; name: string; description: string | null; active: boolean; latestVersion: string | null; priceCents: number; category: string | null; command: string | null; youtubeId: string | null }
 interface AImage { id: number; position: number; contentType: string; sizeBytes: number }
-interface AVersion { id: number; productId: string; version: string; sha256: string; sizeBytes: number; createdAt: string }
+interface AVersion { id: number; productId: string; version: string; sha256: string; sizeBytes: number; createdAt: string; changelog: string | null }
+interface ALoader { available: boolean; sizeBytes: number; sha256: string | null; updatedAt: string | null; source: 'database' | 'disk' | null }
+interface ACheckin { enabled: boolean; rewardsCents: number[]; resetOnMiss: boolean }
 interface ACustomer { id: number; name: string; email: string; createdAt: string; balanceCents: number }
 interface AOrder { id: number; customerId: number; customerEmail: string; status: string; totalCents: number; createdAt: string; paidAt: string | null; items: string[]; kind: string; discountCents: number; bonusCents: number; couponCode: string | null; paidWithBalance: boolean; balanceCents: number }
 interface ACoupon { id: number; code: string; kind: 'DISCOUNT' | 'DEPOSIT_BONUS'; valueType: 'PERCENT' | 'FIXED'; value: number; minCents: number; capCents: number | null; maxUses: number | null; maxUsesPerCustomer: number | null; usedCount: number; expiresAt: string | null; active: boolean; createdAt: string }
@@ -64,8 +66,8 @@ const MAX_IMGS = 10;
 const fmtSize = (b: number) => (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
 
 // ---------- página ----------
-type Tab = 'resumo' | 'produtos' | 'pedidos' | 'clientes' | 'cupons' | 'servidores';
-const TABS: [Tab, string][] = [['resumo', 'Resumo'], ['produtos', 'Produtos'], ['pedidos', 'Pedidos'], ['clientes', 'Clientes'], ['cupons', 'Cupons'], ['servidores', 'Servidores']];
+type Tab = 'resumo' | 'produtos' | 'pedidos' | 'clientes' | 'cupons' | 'checkin' | 'servidores';
+const TABS: [Tab, string][] = [['resumo', 'Resumo'], ['produtos', 'Produtos'], ['pedidos', 'Pedidos'], ['clientes', 'Clientes'], ['cupons', 'Cupons'], ['checkin', 'Check-in'], ['servidores', 'Servidores']];
 
 export function AdminPage() {
   const [authed, setAuthed] = useState(false);
@@ -101,6 +103,7 @@ export function AdminPage() {
       {tab === 'pedidos' && <Orders />}
       {tab === 'clientes' && <Customers />}
       {tab === 'cupons' && <Coupons />}
+      {tab === 'checkin' && <CheckinAdmin />}
       {tab === 'servidores' && <Servers />}
     </div>
   );
@@ -193,6 +196,44 @@ function useLoad<T>(path: string, initial: T) {
   return { data, err, ready, reload };
 }
 
+// ---------- corePlugins.jar (o loader que o cliente baixa) ----------
+function LoaderAdmin() {
+  const info = useLoad<ALoader | null>('/loader', null);
+  const [file, setFile] = useState<File | null>(null);
+  const [fileKey, setFileKey] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ ok: boolean; t: string } | null>(null);
+
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) return;
+    setNote(null); setBusy(true);
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      await acall('POST', '/loader', undefined, fd);
+      setNote({ ok: true, t: 'corePlugins.jar enviado. Os clientes já baixam esta versão.' });
+      setFile(null); setFileKey(k => k + 1); info.reload();
+    } catch (x) { setNote({ ok: false, t: emsg(x) }); }
+    finally { setBusy(false); }
+  };
+
+  const d = info.data;
+  return (
+    <form className="stack card" onSubmit={send}>
+      <h3>corePlugins.jar para download</h3>
+      {info.err && <p className="notice bad" role="alert">{info.err}</p>}
+      {d && d.available && <p className="muted">Atual: {fmtSize(d.sizeBytes)} · {fmtDate(d.updatedAt)}{d.sha256 ? <> · SHA-256 <code title={d.sha256}>{d.sha256.slice(0, 12)}…</code></> : null}{d.source === 'disk' ? ' · vindo de um arquivo em disco (só para desenvolvimento): envie o jar para guardá-lo no banco.' : ''}</p>}
+      {d && !d.available && <p className="muted">Nenhum jar enviado: o botão de download aparece indisponível para os clientes.</p>}
+      <div className="row">
+        <label className="f" style={{ flex: '2 1 240px' }}>Arquivo corePlugins.jar<input key={fileKey} type="file" accept=".jar" onChange={e => setFile(e.target.files?.[0] ?? null)} required /></label>
+        <button className="btn primary" disabled={busy || !file}>{busy ? 'Enviando…' : 'Enviar'}</button>
+      </div>
+      <p className="muted">Use o jar do build final (o que tem a URL da API e as chaves públicas embutidas). Fica guardado no banco, como os jars dos produtos; envie de novo a cada nova versão do loader.</p>
+      {note && <p className={'notice' + (note.ok ? '' : ' bad')} role={note.ok ? 'status' : 'alert'}>{note.t}</p>}
+    </form>
+  );
+}
+
 // ---------- resumo ----------
 function Summary() {
   const orders = useLoad<AOrder[]>('/orders', []);
@@ -216,6 +257,7 @@ function Summary() {
         {stat('Servidores ativos', String(servers.data.filter(s => s.active).length))}
         {stat('Servidores suspensos', String(servers.data.filter(s => !s.active).length))}
       </div>
+      <LoaderAdmin />
     </div>
   );
 }
@@ -294,9 +336,11 @@ function ProductEditor({ product, onChanged }: { product: AProduct; onChanged: (
   const [latest, setLatest] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0); // recria o <input type=file> depois do envio
+  const [notes, setNotes] = useState(''); // notas da versão nova (aparecem em Novidades no site)
   const [editing, setEditing] = useState<string | null>(null); // versão em edição
   const [editVer, setEditVer] = useState('');
   const [editFile, setEditFile] = useState<File | null>(null);
+  const [editNotes, setEditNotes] = useState('');
   const [editKey, setEditKey] = useState(0);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
@@ -343,20 +387,26 @@ function ProductEditor({ product, onChanged }: { product: AProduct; onChanged: (
     e.preventDefault();
     if (!file) return;
     const fd = new FormData(); fd.append('file', file);
+    if (notes.trim()) fd.append('changelog', notes.trim());
     run(() => acall('POST', '/products/' + product.id + '/versions?version=' + encodeURIComponent(ver.trim()) + '&latest=' + latest, undefined, fd),
-      'Versão ' + ver.trim() + ' enviada.', () => { setVer(''); setFile(null); setFileKey(k => k + 1); });
+      'Versão ' + ver.trim() + ' enviada.', () => { setVer(''); setNotes(''); setFile(null); setFileKey(k => k + 1); });
   };
-  const startEdit = (v: string) => { setEditing(v); setEditVer(v); setEditFile(null); setEditKey(k => k + 1); setNote(null); };
+  const startEdit = (v: string) => { setEditing(v); setEditVer(v); setEditFile(null); setEditNotes(versions.data.find(x => x.version === v)?.changelog ?? ''); setEditKey(k => k + 1); setNote(null); };
   const saveEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing) return;
     const newVer = editVer.trim();
-    if (newVer === editing && !editFile) { setNote({ ok: false, t: 'Nada para alterar: mude o número da versão e/ou escolha um novo jar.' }); return; }
+    const notesChanged = editNotes.trim() !== (versions.data.find(x => x.version === editing)?.changelog ?? '');
+    const changed = newVer !== editing || !!editFile;
+    if (!changed && !notesChanged) { setNote({ ok: false, t: 'Nada para alterar: mude o número da versão, as notas e/ou escolha um novo jar.' }); return; }
     const fd = new FormData();
     if (newVer !== editing) fd.append('newVersion', newVer);
     if (editFile) fd.append('file', editFile);
-    run(() => acall('POST', '/products/' + product.id + '/versions/' + encodeURIComponent(editing), undefined, fd),
-      'Versão ' + editing + ' atualizada.', () => { setEditing(null); setEditFile(null); });
+    run(async () => {
+      // as notas vão primeiro, com o número antigo; depois a troca de número/jar
+      if (notesChanged) await acall('PUT', '/products/' + product.id + '/versions/' + encodeURIComponent(editing) + '/changelog', { changelog: editNotes });
+      if (changed) await acall('POST', '/products/' + product.id + '/versions/' + encodeURIComponent(editing), undefined, fd);
+    }, 'Versão ' + editing + ' atualizada.', () => { setEditing(null); setEditFile(null); });
   };
   const delVersion = (v: string) => {
     if (!window.confirm('Excluir a versão ' + v + ' de "' + product.name + '"?\n\nO jar será apagado do servidor. Quem tinha essa versão escolhida passa a receber a mais recente.')) return;
@@ -438,6 +488,7 @@ function ProductEditor({ product, onChanged }: { product: AProduct; onChanged: (
           <label className="f" style={{ flex: '1 1 140px' }}>Número da versão<input type="text" value={editVer} onChange={e => setEditVer(e.target.value)} pattern="[A-Za-z0-9._-]{1,64}" required /></label>
           <label className="f" style={{ flex: '2 1 220px' }}>Trocar o jar (opcional)<input key={editKey} type="file" accept=".jar" onChange={e => setEditFile(e.target.files?.[0] ?? null)} /></label>
         </div>
+        <label className="f">Notas da versão (aparecem em Novidades para quem comprou)<textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={4} maxLength={4000} placeholder="O que mudou nesta versão?" /></label>
         <p className="muted">Deixe o arquivo vazio para só renomear. Com um jar novo, os servidores baixam o arquivo atualizado no próximo login do loader. Quem tinha esta versão escolhida continua nela.</p>
         <div className="row">
           <button className="btn primary" disabled={busy}>{busy ? 'Salvando…' : 'Salvar alterações'}</button>
@@ -451,6 +502,7 @@ function ProductEditor({ product, onChanged }: { product: AProduct; onChanged: (
           <label className="f" style={{ flex: '1 1 140px' }}>Versão<input type="text" value={ver} onChange={e => setVer(e.target.value)} placeholder="1.0.0" pattern="[A-Za-z0-9._-]{1,64}" required /></label>
           <label className="f" style={{ flex: '2 1 220px' }}>Arquivo .jar<input key={fileKey} type="file" accept=".jar" onChange={e => setFile(e.target.files?.[0] ?? null)} required /></label>
         </div>
+        <label className="f">Notas da versão (opcional; aparecem em Novidades para quem comprou)<textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} maxLength={4000} placeholder="O que mudou nesta versão?" /></label>
         <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={latest} onChange={e => setLatest(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent)' }} />Tornar a mais recente (quem acompanha a mais recente passa a receber esta)</label>
         <p className="muted">Para corrigir uma versão já enviada, use Editar na tabela acima (troca o número e/ou o jar). O jar precisa ter <code>plugin.yml</code> e a classe principal estender <code>ProductPlugin</code>.</p>
         <div><button className="btn primary" disabled={busy || !file}>{busy ? 'Enviando…' : 'Enviar versão'}</button></div>
@@ -462,6 +514,60 @@ function ProductEditor({ product, onChanged }: { product: AProduct; onChanged: (
 
 // ---------- pedidos ----------
 const STATUS: Record<string, string> = { PENDING: 'Aguardando', PAID: 'Pago', EXPIRED: 'Expirado', CANCELLED: 'Cancelado', CREDITED: 'Virou saldo' };
+// ---------- check-in diário ----------
+function CheckinAdmin() {
+  const cfg = useLoad<ACheckin | null>('/checkin', null);
+  const [enabled, setEnabled] = useState(false);
+  const [resetOnMiss, setResetOnMiss] = useState(true);
+  const [days, setDays] = useState<string[]>([]);
+  const [note, setNote] = useState<{ ok: boolean; t: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!cfg.data) return;
+    setEnabled(cfg.data.enabled); setResetOnMiss(cfg.data.resetOnMiss);
+    setDays(cfg.data.rewardsCents.map(c => (c / 100).toFixed(2).replace('.', ',')));
+  }, [cfg.data]);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cents: number[] = [];
+    for (const d of days) {
+      const c = parseBRL(d);
+      if (c === null) { setNote({ ok: false, t: 'Valor inválido: "' + d + '". Use o formato 0,50.' }); return; }
+      cents.push(c);
+    }
+    setNote(null); setBusy(true);
+    try { await acall('PUT', '/checkin', { enabled, rewardsCents: cents, resetOnMiss }); setNote({ ok: true, t: 'Configuração salva.' }); cfg.reload(); }
+    catch (x) { setNote({ ok: false, t: emsg(x) }); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <form className="stack" onSubmit={save}>
+      <h3>Check-in diário</h3>
+      <p className="muted">O cliente resgata uma vez por dia (o dia vira à meia-noite, horário de Brasília) e o prêmio entra no saldo da carteira. O valor de cada dia vale para o N-º dia seguido; depois do último, a sequência de prêmios recomeça no dia 1. Vem desligado até você ativar aqui.</p>
+      {cfg.err && <p className="notice bad" role="alert">{cfg.err}</p>}
+      <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent)' }} />Check-in ativado</label>
+      <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={resetOnMiss} onChange={e => setResetOnMiss(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent)' }} />Faltar um dia zera a sequência (desmarcado: ela só para de crescer e continua de onde parou)</label>
+      <div className="row">
+        {days.map((d, i) => (
+          <label className="f" key={i} style={{ flex: '0 1 110px' }}>Dia {i + 1} (R$)
+            <input type="text" inputMode="decimal" value={d} onChange={e => setDays(ds => ds.map((x, j) => (j === i ? e.target.value : x)))} />
+          </label>
+        ))}
+      </div>
+      <div className="row">
+        <button type="button" className="btn small" disabled={days.length >= 31} onClick={() => setDays(ds => [...ds, '0,10'])}>+ Dia</button>
+        <button type="button" className="btn small" disabled={days.length <= 1} onClick={() => setDays(ds => ds.slice(0, -1))}>− Dia</button>
+        <span className="muted">{days.length} {days.length === 1 ? 'dia' : 'dias'} (máx. 31) · cada prêmio de R$ 0,00 a R$ 500,00</span>
+      </div>
+      <div><button className="btn primary" disabled={busy || !cfg.ready}>{busy ? 'Salvando…' : 'Salvar'}</button></div>
+      {note && <p className={'notice' + (note.ok ? '' : ' bad')} role={note.ok ? 'status' : 'alert'}>{note.t}</p>}
+    </form>
+  );
+}
+
 function Orders() {
   const { data, err, ready, reload } = useLoad<AOrder[]>('/orders', []);
   return (

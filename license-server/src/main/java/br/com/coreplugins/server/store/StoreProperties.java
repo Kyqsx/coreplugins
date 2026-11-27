@@ -10,5 +10,7 @@ public record StoreProperties(
         @DefaultValue("") String publicUrl,
         @DefaultValue("30") int orderExpiresMinutes,
         @DefaultValue("5") int maxServersPerCustomer,
-        @DefaultValue("false") boolean mercadopagoTestMode) {
+        @DefaultValue("false") boolean mercadopagoTestMode,
+        /** Caminho do corePlugins.jar (o loader) que o cliente baixa na Área do Cliente. Vazio = procura em loader/target. */
+        @DefaultValue("") String loaderJarPath) {
 }

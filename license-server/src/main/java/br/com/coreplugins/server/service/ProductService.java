@@ -78,7 +78,15 @@ public class ProductService {
     @Transactional
     public ProductVersion addVersion(String productId, String version, MultipartFile file, boolean makeLatest)
             throws IOException {
+        return addVersion(productId, version, file, makeLatest, null);
+    }
+
+    /** Como acima, com as notas da versão (opcionais) que os clientes veem em "Novidades". */
+    @Transactional
+    public ProductVersion addVersion(String productId, String version, MultipartFile file, boolean makeLatest,
+                                     String changelog) throws IOException {
         requireSafe(version, "version");
+        String notes = cleanChangelog(changelog);
         Product product = products.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Produto '" + productId + "' não existe"));
         if (versions.findByProductIdAndVersion(productId, version).isPresent()) {
@@ -88,7 +96,9 @@ public class ProductService {
         if (!hasPluginYml(bytes)) {
             throw new IllegalArgumentException("O jar precisa conter plugin.yml na raiz");
         }
-        ProductVersion pv = versions.save(new ProductVersion(productId, version, sha256(bytes), bytes.length));
+        ProductVersion pv = new ProductVersion(productId, version, sha256(bytes), bytes.length);
+        pv.setChangelog(notes);
+        pv = versions.save(pv);
         jars.save(new ProductJar(pv, bytes));
         if (makeLatest) {
             product.setLatestVersion(version);
@@ -182,6 +192,26 @@ public class ProductService {
         versions.deleteAll(versions.findByProductIdOrderByCreatedAtDesc(productId));
         products.delete(product);
         products.flush();
+    }
+
+    /** Troca as notas da versão (vazio apaga). Não mexe no jar nem no número. */
+    @Transactional
+    public ProductVersion setChangelog(String productId, String version, String changelog) {
+        ProductVersion pv = versions.findByProductIdAndVersion(productId, version)
+                .orElseThrow(() -> new IllegalArgumentException("Versão " + version + " não existe"));
+        pv.setChangelog(cleanChangelog(changelog));
+        return pv;
+    }
+
+    static String cleanChangelog(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        String t = text.strip();
+        if (t.length() > 4000) {
+            throw new IllegalArgumentException("Notas da versão longas demais (máximo 4000 caracteres)");
+        }
+        return t;
     }
 
     /** Bytes do jar da versão {@code versionId}, direto do banco. */

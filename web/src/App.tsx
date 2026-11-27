@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError, brl, getSession, imageUrl, MAX_DEPOSIT, MIN_DEPOSIT, parseBRL, setSession } from './api';
+import { api, ApiError, brl, downloadLoader, getSession, imageUrl, MAX_DEPOSIT, MIN_DEPOSIT, parseBRL, setSession } from './api';
 import { AdminPage } from './Admin';
-import type { CatalogItem, DepositQuote, LibraryItem, Order, Quote, Selection, ServerView, Session, WalletView } from './api';
+import type { CatalogItem, CheckinView, DepositQuote, LibraryItem, LoaderInfo, Order, Quote, Selection, ServerView, Session, UpdateItem, WalletView } from './api';
 
 // ---------- carrinho (localStorage, só ids; o preço vem sempre do servidor) ----------
 const CART_KEY = 'coreplugins.cart';
@@ -94,12 +94,18 @@ export function App() {
   }, []);
 
   // saldo do cabeçalho: atualiza ao entrar, a cada troca de página e ao abrir/fechar o carrinho
+  const [balanceTick, setBalanceTick] = useState(0);
+  useEffect(() => {
+    const f = () => setBalanceTick(t => t + 1);
+    window.addEventListener('coreplugins-balance', f); // ex.: check-in diário creditou saldo
+    return () => window.removeEventListener('coreplugins-balance', f);
+  }, []);
   useEffect(() => {
     if (!session) { setBalance(null); return; }
     let alive = true;
     api.me().then(m => { if (alive) setBalance(m.balanceCents); }).catch(() => { /* o 401 já derruba a sessão */ });
     return () => { alive = false; };
-  }, [session, hash, cartOpen]);
+  }, [session, hash, cartOpen, balanceTick]);
 
   const updateCart = (c: string[]) => { setCart(c); saveCart(c); };
 
@@ -130,9 +136,8 @@ export function App() {
   let page;
   if (path.startsWith('/pedido/')) page = session ? <OrderPage id={Number(path.slice(8))} clearCart={() => updateCart([])} /> : <NeedLogin openAuth={openAuth} />;
   else if (path.startsWith('/plugin/')) page = <PluginPage id={safeDecode(path.slice(8))} cart={cart} setCart={updateCart} session={session} openCart={openCart} />;
-  else if (path === '/saldo') page = session ? <WalletPage /> : <NeedLogin openAuth={openAuth} />;
   else if (path === '/admin') page = <AdminPage />;
-  else if (path === '/area') page = session ? <AreaPage /> : <NeedLogin openAuth={openAuth} />;
+  else if (path === '/area' || path.startsWith('/area/') || path === '/saldo') page = session ? <ClientArea path={path} refreshKey={paidOrder ? paidOrder.id : 0} /> : <NeedLogin openAuth={openAuth} />;
   else page = <HomePage cart={cart} setCart={updateCart} session={session} openCart={openCart} openAuth={openAuth} />;
 
   const on = (p: string) => (path === p ? 'on' : undefined);
@@ -151,7 +156,7 @@ export function App() {
             {session ? (
               <>
                 <a href="#/saldo" className={on('/saldo')}><i className="fa-solid fa-wallet" aria-hidden="true" />{balance !== null ? ' ' + brl(balance) : ''}</a>
-                <a href="#/area" className={on('/area')}><i className="fa-solid fa-user" aria-hidden="true" /> Área do Cliente</a>
+                <a href="#/area" className={path === '/area' || path.startsWith('/area/') ? 'on' : undefined}><i className="fa-solid fa-user" aria-hidden="true" /> Área do Cliente</a>
                 <a href="#/" onClick={e => { e.preventDefault(); logout(); }}><i className="fa-solid fa-right-from-bracket" aria-hidden="true" /> Sair</a>
               </>
             ) : (
@@ -809,7 +814,7 @@ function OrderPage({ id, clearCart, initial, embedded }: { id: number; clearCart
 const label = (s: Order['status']) => ({ PENDING: 'Aguardando pagamento', PAID: 'Pago', EXPIRED: 'Expirado', CANCELLED: 'Cancelado', CREDITED: 'Convertido em saldo' }[s]);
 
 // ---------- saldo / depósito ----------
-const TX_LABEL: Record<string, string> = { DEPOSIT: 'Depósito', BONUS: 'Bônus', PURCHASE: 'Compra', REFUND: 'Estorno', ADMIN_CREDIT: 'Crédito', ADMIN_DEBIT: 'Débito' };
+const TX_LABEL: Record<string, string> = { DEPOSIT: 'Depósito', BONUS: 'Bônus', PURCHASE: 'Compra', REFUND: 'Estorno', ADMIN_CREDIT: 'Crédito', ADMIN_DEBIT: 'Débito', CHECKIN: 'Check-in' };
 const PRESETS = [10, 25, 50, 100];
 
 function WalletPage() {
@@ -898,7 +903,24 @@ function WalletPage() {
 }
 
 // ---------- Área do Cliente ----------
-function AreaPage() {
+// ---------- Área do Cliente: sidebar + páginas ----------
+const AREA_NAV: { to: string; icon: string; label: string }[] = [
+  { to: '/area', icon: 'fa-house', label: 'Início' },
+  { to: '/area/plugins', icon: 'fa-puzzle-piece', label: 'Meus plugins' },
+  { to: '/area/servidores', icon: 'fa-server', label: 'Servidores' },
+  { to: '/area/pedidos', icon: 'fa-receipt', label: 'Pedidos' },
+  { to: '/saldo', icon: 'fa-wallet', label: 'Saldo' },
+];
+const dateBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
+const fmtMB = (b: number) => (b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
+const serverName = (s: ServerView) => (s.label ? s.label + ' — ' : '') + s.ip + ':' + s.port;
+
+/**
+ * Moldura da Área do Cliente: sidebar + a página escolhida. Fica montada ao trocar de página (os dados de
+ * plugins, servidores e pedidos são carregados uma vez e recarregados a cada troca). {@code refreshKey} muda
+ * quando um pedido é pago, para a biblioteca já aparecer atualizada.
+ */
+function ClientArea({ path, refreshKey }: { path: string; refreshKey: number }) {
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [servers, setServers] = useState<ServerView[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -912,52 +934,291 @@ function AreaPage() {
     } catch (e) { setErr(msg(e)); }
     setReady(true);
   }, []);
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { reload(); }, [reload, path, refreshKey]);
   const replace = (s: ServerView) => setServers(prev => prev.map(x => (x.id === s.id ? s : x)));
 
+  const active = (to: string) => (to === '/area' ? !AREA_NAV.some(n => n.to !== '/area' && n.to === path) : path === to);
+  let page;
+  if (path === '/saldo') page = <WalletPage />;
+  else if (path === '/area/plugins') page = <MyPluginsPage library={library} servers={servers} ready={ready} />;
+  else if (path === '/area/servidores') page = <ServersPage library={library} servers={servers} replace={replace} onAdded={s => setServers(prev => [...prev, s])} />;
+  else if (path === '/area/pedidos') page = <OrdersPage orders={orders} ready={ready} />;
+  else page = <AreaHome library={library} servers={servers} ready={ready} onAssigned={replace} />;
+
+  return (
+    <div className="area">
+      <aside className="area-side">
+        <nav aria-label="Área do Cliente">
+          {AREA_NAV.map(n => (
+            <a key={n.to} href={'#' + n.to} className={active(n.to) ? 'on' : undefined} aria-current={active(n.to) ? 'page' : undefined}>
+              <i className={'fa-solid ' + n.icon} aria-hidden="true" /> {n.label}
+            </a>
+          ))}
+        </nav>
+      </aside>
+      <div className="area-main stack">
+        {err && <p className="notice bad" role="alert">{err}</p>}
+        {page}
+      </div>
+    </div>
+  );
+}
+
+/** Início: check-in diário + download do loader, plugins sem servidor e novidades. */
+function AreaHome({ library, servers, ready, onAssigned }: { library: LibraryItem[]; servers: ServerView[]; ready: boolean; onAssigned: (s: ServerView) => void }) {
   return (
     <div className="stack">
-      <h2>Área do Cliente</h2>
-      {err && <p className="notice bad" role="alert">{err}</p>}
-      {!ready && <p className="muted">Carregando…</p>}
+      <h2>Início</h2>
+      <div className="dash-top">
+        <CheckinCard />
+        <LoaderCard />
+      </div>
+      <UnassignedSection library={library} servers={servers} ready={ready} onAssigned={onAssigned} />
+      <UpdatesSection />
+    </div>
+  );
+}
 
-      <section className="stack">
-        <h3>Meus plugins</h3>
-        {ready && library.length === 0 && <p className="muted">Você ainda não comprou nenhum plugin. <a href="#/">Ver catálogo</a></p>}
-        <div className="grid">
-          {library.map(p => (
+function CheckinCard() {
+  const [c, setC] = useState<CheckinView | null>(null);
+  const [err, setErr] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    api.checkin().then(v => { if (alive) setC(v); }).catch(e => { if (alive) setErr(msg(e)); });
+    return () => { alive = false; };
+  }, []);
+
+  const claim = async () => {
+    setErr(''); setNote(''); setBusy(true);
+    try {
+      const r = await api.claimCheckin();
+      setNote(r.rewardCents > 0 ? '+' + brl(r.rewardCents) + ' adicionados ao seu saldo!' : 'Check-in feito!');
+      window.dispatchEvent(new Event('coreplugins-balance'));
+    } catch (e) { setErr(msg(e)); }
+    try { setC(await api.checkin()); } catch { /* mantém o que está na tela */ }
+    setBusy(false);
+  };
+
+  return (
+    <article className="card checkin">
+      <div className="row between">
+        <h3><i className="fa-solid fa-calendar-check" aria-hidden="true" />Check-in diário</h3>
+        {c?.enabled && <span className="streak"><i className="fa-solid fa-fire" aria-hidden="true" /> {c.streak} {c.streak === 1 ? 'dia seguido' : 'dias seguidos'}</span>}
+      </div>
+      {!c && !err && <p className="muted">Carregando…</p>}
+      {c && !c.enabled && <p className="muted">O check-in diário está desativado no momento.</p>}
+      {c?.enabled && <>
+        <ol className="checkin-days" aria-label="Prêmio de cada dia da sequência">
+          {c.rewardsCents.map((r, i) => {
+            const day = i + 1;
+            const done = c.claimedToday ? day <= c.dayInCycle : day < c.dayInCycle;
+            const today = !c.claimedToday && day === c.dayInCycle;
+            return (
+              <li key={i} className={(done ? 'done ' : '') + (today ? 'today' : '')}>
+                <span className="d">Dia {day}</span>
+                <b>{r > 0 ? brl(r) : '—'}</b>
+                {done && <i className="fa-solid fa-check" role="img" aria-label="resgatado" />}
+              </li>
+            );
+          })}
+        </ol>
+        <div className="row">
+          <button className="btn primary fullw" onClick={claim} disabled={busy || c.claimedToday}>
+            {c.claimedToday
+              ? <><i className="fa-solid fa-check" aria-hidden="true" /> Check-in feito hoje</>
+              : busy ? 'Resgatando…'
+              : <><i className="fa-solid fa-gift" aria-hidden="true" /> Fazer check-in{c.todayRewardCents > 0 ? ' (+' + brl(c.todayRewardCents) + ')' : ''}</>}
+          </button>
+        </div>
+      </>}
+      {note && <p className="notice" role="status">{note}</p>}
+      {err && <p className="notice bad" role="alert">{err}</p>}
+    </article>
+  );
+}
+
+function LoaderCard() {
+  const [info, setInfo] = useState<LoaderInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    api.loaderInfo().then(i => { if (alive) setInfo(i); }).catch(() => { if (alive) setInfo({ available: false, sizeBytes: 0, updatedAt: null }); });
+    return () => { alive = false; };
+  }, []);
+
+  const download = async () => {
+    setErr(''); setBusy(true);
+    try { await downloadLoader(); } catch (e) { setErr(msg(e)); }
+    setBusy(false);
+  };
+
+  return (
+    <article className="card loader-card">
+      <h3><i className="fa-solid fa-cube" aria-hidden="true" />corePlugins.jar</h3>
+      <p className="muted">O único arquivo que você instala. Coloque na pasta <code>plugins/</code> do servidor, reinicie e cadastre o IP:porta em <a href="#/area/servidores">Servidores</a>.</p>
+      <button className="btn primary" onClick={download} disabled={busy || !info?.available}>
+        <i className="fa-solid fa-download" aria-hidden="true" /> {busy ? 'Baixando…' : 'Baixar corePlugins.jar'}
+      </button>
+      {info?.available && <p className="muted">{fmtMB(info.sizeBytes)}{info.updatedAt ? ' · atualizado em ' + dateBR(info.updatedAt) : ''}</p>}
+      {info && !info.available && <p className="muted">Download indisponível no momento.</p>}
+      {err && <p className="notice bad" role="alert">{err}</p>}
+    </article>
+  );
+}
+
+/** Plugins comprados que ainda não estão marcados em nenhum servidor, com atribuição rápida. */
+function UnassignedSection({ library, servers, ready, onAssigned }: { library: LibraryItem[]; servers: ServerView[]; ready: boolean; onAssigned: (s: ServerView) => void }) {
+  const [note, setNote] = useState('');
+  const used = new Set(servers.flatMap(s => s.products.map(p => p.productId)));
+  const free = library.filter(p => !used.has(p.id));
+  const assigned = (s: ServerView, p: LibraryItem) => {
+    onAssigned(s);
+    setNote(p.name + ' atribuído a ' + serverName(s) + '. Vale em até 30 min; para aplicar já, rode /coreplugins reload no servidor.');
+  };
+  return (
+    <section className="stack">
+      <h3>Plugins sem servidor</h3>
+      {ready && library.length === 0 && <p className="muted">Você ainda não comprou nenhum plugin. <a href="#/">Ver catálogo</a></p>}
+      {ready && library.length > 0 && free.length === 0 && <p className="muted"><i className="fa-solid fa-circle-check" aria-hidden="true" /> Todos os seus plugins já estão atribuídos a um servidor.</p>}
+      {free.length > 0 && <p className="muted">Estes plugins são seus, mas ainda não rodam em nenhum servidor.</p>}
+      {note && <p className="notice" role="status">{note}</p>}
+      <div className="grid">{free.map(p => <UnassignedCard key={p.id} plugin={p} servers={servers} onAssigned={s => assigned(s, p)} />)}</div>
+    </section>
+  );
+}
+
+function UnassignedCard({ plugin, servers, onAssigned }: { plugin: LibraryItem; servers: ServerView[]; onAssigned: (s: ServerView) => void }) {
+  const [sid, setSid] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const chosen = sid !== '' ? sid : (servers.length === 1 ? String(servers[0].id) : '');
+
+  const assign = async () => {
+    const s = servers.find(x => String(x.id) === chosen);
+    if (!s) return;
+    setErr(''); setBusy(true);
+    try {
+      // o servidor troca a lista inteira: manda o que já estava marcado + este plugin (versão vazia = a mais recente)
+      const keep: Selection[] = s.products.map(g => ({ productId: g.productId, version: g.version }));
+      onAssigned(await api.setProducts(s.id, [...keep, { productId: plugin.id, version: null }]));
+    } catch (e) { setErr(msg(e)); setBusy(false); }
+  };
+
+  return (
+    <article className="card">
+      <div className="card-head">
+        <PixelIcon id={plugin.id} cat={plugin.category} />
+        <div><CatTag cat={plugin.category} /><h3>{plugin.name}</h3></div>
+      </div>
+      <p className="muted">versão {plugin.version}{plugin.command ? <> · <code className="cmd">{plugin.command}</code></> : null}</p>
+      {servers.length === 0
+        ? <a className="btn" href="#/area/servidores"><i className="fa-solid fa-plus" aria-hidden="true" /> Cadastrar um servidor</a>
+        : (
+          <div className="row assign">
+            <select aria-label={'Servidor para ' + plugin.name} value={chosen} onChange={e => setSid(e.target.value)}>
+              {servers.length > 1 && <option value="">Escolher servidor…</option>}
+              {servers.map(s => <option key={s.id} value={String(s.id)}>{serverName(s)}</option>)}
+            </select>
+            <button className="btn primary small" disabled={busy || chosen === ''} onClick={assign}>{busy ? 'Atribuindo…' : 'Atribuir'}</button>
+          </div>
+        )}
+      {err && <p className="notice bad" role="alert">{err}</p>}
+    </article>
+  );
+}
+
+/** Novidades: versões publicadas dos plugins que o cliente comprou, com as notas escritas no painel admin. */
+function UpdatesSection() {
+  const [items, setItems] = useState<UpdateItem[] | null>(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let alive = true;
+    api.updates().then(u => { if (alive) setItems(u); }).catch(e => { if (alive) setErr(msg(e)); });
+    return () => { alive = false; };
+  }, []);
+  return (
+    <section className="stack">
+      <h3>Novidades dos plugins</h3>
+      {err && <p className="notice bad" role="alert">{err}</p>}
+      {items === null && !err && <p className="muted">Carregando…</p>}
+      {items !== null && items.length === 0 && <p className="muted">Nenhuma atualização por enquanto.</p>}
+      {items !== null && items.length > 0 && (
+        <ul className="news">
+          {items.map(u => (
+            <li key={u.productId + '@' + u.version} className="card news-item">
+              <PixelIcon id={u.productId} cat={u.category} />
+              <div className="news-body">
+                <div className="row">
+                  <b>{u.productName}</b>
+                  <span className="ver">v{u.version.replace(/^v/i, '')}</span>
+                  {u.latest && <span className="status PAID">mais recente</span>}
+                  <span className="muted">{dateBR(u.createdAt)}</span>
+                </div>
+                {u.changelog ? <p className="changelog">{u.changelog}</p> : <p className="muted">Sem notas para esta versão.</p>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function MyPluginsPage({ library, servers, ready }: { library: LibraryItem[]; servers: ServerView[]; ready: boolean }) {
+  return (
+    <div className="stack">
+      <h2>Meus plugins</h2>
+      {ready && library.length === 0 && <p className="muted">Você ainda não comprou nenhum plugin. <a href="#/">Ver catálogo</a></p>}
+      <div className="grid">
+        {library.map(p => {
+          const where = servers.filter(s => s.products.some(g => g.productId === p.id));
+          return (
             <article className="card" key={p.id}>
               <div className="card-head">
                 <PixelIcon id={p.id} cat={p.category} />
                 <div><CatTag cat={p.category} /><h3>{p.name}</h3></div>
               </div>
               <p className="muted">versão {p.version}{p.command ? <> · <code className="cmd">{p.command}</code></> : null}</p>
+              <p className="muted">{where.length > 0 ? 'Em: ' + where.map(s => s.label || s.ip + ':' + s.port).join(', ') : 'Sem servidor'}</p>
             </article>
-          ))}
-        </div>
-      </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-      <section className="stack">
-        <h3>Meus servidores</h3>
-        <p className="muted">Informe o IP e a porta exatos do servidor (a porta do <code>server.properties</code>). A licença vale para esse IP:porta.</p>
-        {servers.map(s => <ServerCard key={s.id} server={s} library={library} onChange={replace} />)}
-        <AddServer onAdded={s => setServers(prev => [...prev, s])} />
-      </section>
+function ServersPage({ library, servers, replace, onAdded }: { library: LibraryItem[]; servers: ServerView[]; replace: (s: ServerView) => void; onAdded: (s: ServerView) => void }) {
+  return (
+    <div className="stack">
+      <h2>Servidores</h2>
+      <p className="muted">Informe o IP e a porta exatos do servidor (a porta do <code>server.properties</code>). A licença vale para esse IP:porta.</p>
+      {servers.map(s => <ServerCard key={s.id} server={s} library={library} onChange={replace} />)}
+      <AddServer onAdded={onAdded} />
+    </div>
+  );
+}
 
-      <section className="stack">
-        <h3>Pedidos</h3>
-        {ready && orders.length === 0 && <p className="muted">Nenhum pedido.</p>}
-        {orders.length > 0 && <div className="scroll"><table>
-          <thead><tr><th>#</th><th>Itens</th><th>Total</th><th>Status</th></tr></thead>
-          <tbody>{orders.map(o => (
-            <tr key={o.id}>
-              <td><a href={'#/pedido/' + o.id}>#{o.id}</a></td>
-              <td>{o.kind === 'DEPOSIT' ? 'Depósito de saldo' : o.items.map(i => i.name).join(', ')}</td>
-              <td>{brl(o.totalCents)}</td>
-              <td><span className={'status ' + o.status}>{label(o.status)}</span></td>
-            </tr>))}</tbody>
-        </table></div>}
-      </section>
+function OrdersPage({ orders, ready }: { orders: Order[]; ready: boolean }) {
+  return (
+    <div className="stack">
+      <h2>Pedidos</h2>
+      {ready && orders.length === 0 && <p className="muted">Nenhum pedido.</p>}
+      {orders.length > 0 && <div className="scroll"><table>
+        <thead><tr><th>#</th><th>Itens</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody>{orders.map(o => (
+          <tr key={o.id}>
+            <td><a href={'#/pedido/' + o.id}>#{o.id}</a></td>
+            <td>{o.kind === 'DEPOSIT' ? 'Depósito de saldo' : o.items.map(i => i.name).join(', ')}</td>
+            <td>{brl(o.totalCents)}</td>
+            <td><span className={'status ' + o.status}>{label(o.status)}</span></td>
+          </tr>))}</tbody>
+      </table></div>}
     </div>
   );
 }

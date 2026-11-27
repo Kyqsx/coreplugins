@@ -44,3 +44,4 @@ store:
   mercadopago-test-mode: ${MP_TEST_MODE:false}     # true só com credencial de TESTE: envia payer.first_name=APRO (aprovação automática na sandbox)
   order-expires-minutes: 30
   max-servers-per-customer: 5
+  loader-jar-path: ${LOADER_JAR_PATH:}                # corePlugins.jar que o cliente baixa na Área do Cliente (vazio: procura loader/target/corePlugins.jar)
